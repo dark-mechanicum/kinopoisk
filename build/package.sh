@@ -18,7 +18,7 @@ timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 cat > "$publish/meta.json" <<JSON
 {
-  "category": "Metadata",
+  "category": "MoviesAndShows",
   "guid": "$guid",
   "name": "КиноПоиск",
   "description": "Метаданные и изображения фильмов, сериалов, эпизодов и персон с КиноПоиска.",

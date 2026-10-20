@@ -5,7 +5,7 @@ guid: "9b3b77c3-61a9-43a0-bfea-0be2c473e8bd"
 targetAbi: "12.2.0.0"
 framework: "net10.0"
 owner: "dark-mechanicum"
-category: "Metadata"
+category: "MoviesAndShows"
 overview: "Информация о фильмах, сериалах и персонах с КиноПоиска"
 description: >
   Загружает метаданные и изображения фильмов, сериалов, эпизодов и персон с КиноПоиска.
