@@ -22,9 +22,29 @@ ported to Jellyfin 12 / .NET 10 and reworked.
 
 - Movies without a Kinopoisk id are matched by name and year, then by file name
   (`The.Matrix.1999.1080p.BluRay.mkv` → «Матрица»).
+- An explicit Kinopoisk id in the file or folder name skips the search entirely — see below.
 - Episodes are matched by season/episode number: through the full season list for series on the Kinopoisk streaming
   service, otherwise among the 30 most recent episodes (a Kinopoisk API limit).
 - Responses are cached for an hour; requests are sent one at a time.
+
+## Kinopoisk id in file and folder names
+
+Put the Kinopoisk id into the name to match an item exactly (case-insensitive, with or without brackets):
+
+```text
+Movies/Матрица (1999) [kp301]/Матрица.mkv
+Movies/The.Matrix.1999.kp-301.1080p.mkv
+TV/Игра престолов [kp-464963]/Season 01/...
+```
+
+Accepted forms: `kp301`, `kp-301`, `kp_301`, `kp=301`, `kpid-301`, `kinopoisk-301`, `kinopoiskid=301`, optionally in
+`[]`, `()` or `{}`. The tag must not touch other letters or digits (`Skp301` and `kp301x` are ignored).
+
+- **Movies:** the file name is checked first, then the folder that contains it.
+- **Series:** the series folder name.
+- An id in the name **wins over the id stored on the item**, so renaming a folder fixes a wrong match on the next metadata
+  refresh. If Kinopoisk does not know the id, the item gets no metadata rather than a guess by name.
+- Episodes use the id of their series.
 
 ## Installation
 

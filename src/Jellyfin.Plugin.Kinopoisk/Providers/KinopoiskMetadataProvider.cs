@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.Kinopoisk.Providers;
 
 /// <summary>
-/// Shared metadata flow: resolve the Kinopoisk id (stored, or by search), fetch, map.
+/// Shared metadata flow: resolve the Kinopoisk id (tag in the path, stored, or by search), fetch, map.
 /// </summary>
 /// <typeparam name="TItem">The Jellyfin item type.</typeparam>
 /// <typeparam name="TLookup">The lookup info type.</typeparam>
@@ -53,12 +53,8 @@ public abstract class KinopoiskMetadataProvider<TItem, TLookup> : IRemoteMetadat
         var result = MetadataResultExtensions.CreateResult<TItem>();
         try
         {
-            result.QueriedById = info.TryGetKinopoiskId(out var kinopoiskId);
-            if (!result.QueriedById)
-            {
-                kinopoiskId = await FindIdAsync(info, cancellationToken).ConfigureAwait(false);
-            }
-
+            var (kinopoiskId, queriedById) = await ResolveIdAsync(info, cancellationToken).ConfigureAwait(false);
+            result.QueriedById = queriedById;
             if (kinopoiskId > 0)
             {
                 await FillAsync(result, kinopoiskId, cancellationToken).ConfigureAwait(false);
@@ -129,6 +125,33 @@ public abstract class KinopoiskMetadataProvider<TItem, TLookup> : IRemoteMetadat
         {
             yield return info.Year is null ? info.Name : $"{info.Name} {info.Year}";
         }
+    }
+
+    /// <summary>
+    /// File and folder names of the item that may carry a <c>kp1234</c> id tag, most specific first.
+    /// </summary>
+    /// <param name="info">The lookup info.</param>
+    /// <returns>The names.</returns>
+    protected virtual IEnumerable<string> GetPathNames(TLookup info) => [];
+
+    private async Task<(int Id, bool QueriedById)> ResolveIdAsync(TLookup info, CancellationToken cancellationToken)
+    {
+        // A tag in the path wins over a stored id, so renaming a folder fixes a wrong match on the next refresh.
+        foreach (var name in GetPathNames(info))
+        {
+            if (name.TryParseKinopoiskId(out var taggedId))
+            {
+                Logger.LogDebug("Kinopoisk id {Id} taken from '{PathName}'", taggedId, name);
+                return (taggedId, true);
+            }
+        }
+
+        if (info.TryGetKinopoiskId(out var storedId))
+        {
+            return (storedId, true);
+        }
+
+        return (await FindIdAsync(info, cancellationToken).ConfigureAwait(false), false);
     }
 
     private async Task<int> FindIdAsync(TLookup info, CancellationToken cancellationToken)

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -42,4 +43,15 @@ public sealed class SeriesMetadataProvider : KinopoiskMetadataProvider<Series, S
     /// <inheritdoc />
     protected override async Task FillAsync(MetadataResult<Series> result, int kinopoiskId, CancellationToken cancellationToken)
         => result.FillFrom(await Client.GetSeriesAsync(kinopoiskId, cancellationToken).ConfigureAwait(false));
+
+    /// <inheritdoc />
+    protected override IEnumerable<string> GetPathNames(SeriesInfo info)
+    {
+        // A series path is its folder.
+        var folder = Path.GetFileName(Path.TrimEndingDirectorySeparator(info.Path ?? string.Empty));
+        if (!string.IsNullOrEmpty(folder))
+        {
+            yield return folder;
+        }
+    }
 }

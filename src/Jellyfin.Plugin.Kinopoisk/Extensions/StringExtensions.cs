@@ -8,10 +8,31 @@ using System.Text.RegularExpressions;
 namespace Jellyfin.Plugin.Kinopoisk.Extensions;
 
 /// <summary>
-/// Turns a media file name into search keywords.
+/// Turns a media file name into search keywords or an explicit Kinopoisk id.
 /// </summary>
 public static partial class StringExtensions
 {
+    /// <summary>
+    /// Finds an explicit Kinopoisk id tag in a file or folder name: <c>kp301</c>, <c>kp-301</c>,
+    /// <c>[kpid=301]</c>, <c>{kinopoisk_301}</c>... (case-insensitive, not part of a longer word or number).
+    /// </summary>
+    /// <param name="name">The file or folder name.</param>
+    /// <param name="kinopoiskId">The id, when a valid tag is found.</param>
+    /// <returns><c>true</c> when the name carries a positive Kinopoisk id.</returns>
+    public static bool TryParseKinopoiskId(this string? name, out int kinopoiskId)
+    {
+        kinopoiskId = 0;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        var match = KinopoiskIdTag().Match(name);
+        return match.Success
+            && int.TryParse(match.Groups["id"].ValueSpan, NumberStyles.None, CultureInfo.InvariantCulture, out kinopoiskId)
+            && kinopoiskId > 0;
+    }
+
     /// <summary>
     /// Builds (title, year) search candidates from a file path, best candidates first.
     /// </summary>
@@ -91,4 +112,7 @@ public static partial class StringExtensions
 
     [GeneratedRegex("EXTENDED|BDRIP|BRRIP|DVDRIP", RegexOptions.IgnoreCase)]
     private static partial Regex VideoFormats();
+
+    [GeneratedRegex(@"(?<![\p{L}\p{N}])(?:kp|kinopoisk)(?:id)?[-_=]?(?<id>\d+)(?![\p{L}\p{N}])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex KinopoiskIdTag();
 }

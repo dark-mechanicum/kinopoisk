@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -42,6 +43,24 @@ public sealed class MovieMetadataProvider : KinopoiskMetadataProvider<Movie, Mov
     /// <inheritdoc />
     protected override async Task FillAsync(MetadataResult<Movie> result, int kinopoiskId, CancellationToken cancellationToken)
         => result.FillFrom(await Client.GetFilmAsync(kinopoiskId, cancellationToken).ConfigureAwait(false));
+
+    /// <inheritdoc />
+    protected override IEnumerable<string> GetPathNames(MovieInfo info)
+    {
+        if (string.IsNullOrWhiteSpace(info.Path))
+        {
+            yield break;
+        }
+
+        // The file itself first (movies in a mixed folder), then the movie's own folder.
+        yield return Path.GetFileName(info.Path);
+
+        var folder = Path.GetFileName(Path.GetDirectoryName(info.Path));
+        if (!string.IsNullOrEmpty(folder))
+        {
+            yield return folder;
+        }
+    }
 
     /// <inheritdoc />
     protected override IEnumerable<string> GetKeywords(MovieInfo info)
