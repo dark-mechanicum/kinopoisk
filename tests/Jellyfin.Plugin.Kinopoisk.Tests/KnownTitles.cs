@@ -24,6 +24,15 @@ public static class KnownTitles
     /// <summary>Content UUID of season 1 of «Метод» (16 episodes).</summary>
     public const string MetodSeason1ContentId = "406547c4784c613a96dadc9321e78afa";
 
+    /// <summary>«Незнайка на Луне» (1997-1999): a cartoon Kinopoisk files as a TV series, often kept as a movie.</summary>
+    public const int NeznaykaNaLuneId = 41562;
+
+    /// <summary>«Незнайка на Луне 2» (1999), the film sequel of «Незнайка на Луне».</summary>
+    public const int NeznaykaNaLune2Id = 41563;
+
+    /// <summary>«Незнайка учится» (1961).</summary>
+    public const int NeznaykaUchitsyaId = 257947;
+
     /// <summary>Keanu Reeves.</summary>
     public const int KeanuReevesId = 7836;
 

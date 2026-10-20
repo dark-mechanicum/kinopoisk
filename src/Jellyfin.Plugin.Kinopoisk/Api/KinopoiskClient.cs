@@ -39,17 +39,20 @@ public sealed class KinopoiskClient : IKinopoiskClient
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<FilmInfo>> SearchFilmsAsync(string keyword, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<FilmInfo>> SearchFilmsAsync(string title, int? year, CancellationToken cancellationToken)
     {
-        var top = await SuggestAsync(keyword, cancellationToken).ConfigureAwait(false);
-        var results = new List<FilmInfo>();
-        if (top.TopResult?.Global is { IsPerson: false, Title: not null } best)
+        // Kinopoisk matches a year in the keyword as text, not as a filter: "title year" drops most titles,
+        // and a year that is off by one finds nothing. So the plain title is searched too, and the year only ranks.
+        var films = new List<FilmInfo>(await SuggestFilmsAsync(title, cancellationToken).ConfigureAwait(false));
+        if (year is not null)
         {
-            results.Add(best.ToFilm());
+            films.AddRange(await SuggestFilmsAsync($"{title} {year}", cancellationToken).ConfigureAwait(false));
         }
 
-        results.AddRange(top.Movies.Select(m => m.Movie).OfType<FilmInfo>());
-        return [.. results.Where(f => f.Id > 0).DistinctBy(f => f.Id)];
+        return [.. films
+            .DistinctBy(f => f.Id)
+            .OrderByDescending(f => f.IsReleasedIn(year))
+            .ThenByDescending(f => f.HasTitle(title))];
     }
 
     /// <inheritdoc />
@@ -103,6 +106,10 @@ public sealed class KinopoiskClient : IKinopoiskClient
             },
             "data.tvSeries",
             cancellationToken));
+
+    /// <inheritdoc />
+    public Task<FilmInfo> GetTitleAsync(int id, CancellationToken cancellationToken)
+        => CachedAsync($"title:{id}", () => FetchFilmOrSeriesAsync(id, cancellationToken));
 
     /// <inheritdoc />
     public Task<FilmInfo> GetFilmPageAsync(string contentId, CancellationToken cancellationToken)
@@ -169,6 +176,32 @@ public sealed class KinopoiskClient : IKinopoiskClient
         }
 
         return episodes;
+    }
+
+    private async Task<FilmInfo> FetchFilmOrSeriesAsync(int id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await GetFilmAsync(id, cancellationToken).ConfigureAwait(false);
+        }
+        catch (KinopoiskApiException)
+        {
+            // Kinopoisk files some titles that libraries keep as movies (e.g. multi-part cartoons) as series.
+            return await GetSeriesAsync(id, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<IReadOnlyList<FilmInfo>> SuggestFilmsAsync(string keyword, CancellationToken cancellationToken)
+    {
+        var top = await SuggestAsync(keyword, cancellationToken).ConfigureAwait(false);
+        var results = new List<FilmInfo>();
+        if (top.TopResult?.Global is { IsPerson: false, Title: not null } best)
+        {
+            results.Add(best.ToFilm());
+        }
+
+        results.AddRange(top.Movies.Select(m => m.Movie).OfType<FilmInfo>());
+        return [.. results.Where(f => f.Id > 0)];
     }
 
     private Task<SuggestTop> SuggestAsync(string keyword, CancellationToken cancellationToken)

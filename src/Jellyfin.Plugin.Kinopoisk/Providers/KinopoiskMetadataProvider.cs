@@ -81,8 +81,7 @@ public abstract class KinopoiskMetadataProvider<TItem, TLookup> : IRemoteMetadat
             return [];
         }
 
-        var keyword = searchInfo.Year is null ? searchInfo.Name : $"{searchInfo.Name} {searchInfo.Year}";
-        return await SearchAsync(keyword, cancellationToken).ConfigureAwait(false);
+        return await SearchAsync(searchInfo.Name, searchInfo.Year, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -90,12 +89,13 @@ public abstract class KinopoiskMetadataProvider<TItem, TLookup> : IRemoteMetadat
         => _httpClientFactory.CreateClient(NamedClient.Default).GetAsync(url, cancellationToken);
 
     /// <summary>
-    /// Searches by keyword.
+    /// Searches by title.
     /// </summary>
-    /// <param name="keyword">The keyword.</param>
+    /// <param name="title">The title.</param>
+    /// <param name="year">The year, if known; it ranks the results.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The results, best first.</returns>
-    protected abstract Task<IReadOnlyList<RemoteSearchResult>> SearchAsync(string keyword, CancellationToken cancellationToken);
+    protected abstract Task<IReadOnlyList<RemoteSearchResult>> SearchAsync(string title, int? year, CancellationToken cancellationToken);
 
     /// <summary>
     /// Builds the search result for a known id.
@@ -115,15 +115,15 @@ public abstract class KinopoiskMetadataProvider<TItem, TLookup> : IRemoteMetadat
     protected abstract Task FillAsync(MetadataResult<TItem> result, int kinopoiskId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Keywords to try when the item has no Kinopoisk id yet, best first.
+    /// Title and year pairs to search when the item has no Kinopoisk id yet, best first.
     /// </summary>
     /// <param name="info">The lookup info.</param>
-    /// <returns>The keywords.</returns>
-    protected virtual IEnumerable<string> GetKeywords(TLookup info)
+    /// <returns>The search terms.</returns>
+    protected virtual IEnumerable<(string Title, int? Year)> GetSearchTerms(TLookup info)
     {
         if (!string.IsNullOrWhiteSpace(info.Name))
         {
-            yield return info.Year is null ? info.Name : $"{info.Name} {info.Year}";
+            yield return (info.Name, info.Year);
         }
     }
 
@@ -156,12 +156,13 @@ public abstract class KinopoiskMetadataProvider<TItem, TLookup> : IRemoteMetadat
 
     private async Task<int> FindIdAsync(TLookup info, CancellationToken cancellationToken)
     {
-        foreach (var keyword in GetKeywords(info).Distinct())
+        foreach (var (title, year) in GetSearchTerms(info).Distinct())
         {
-            var matches = await SearchAsync(keyword, cancellationToken).ConfigureAwait(false);
+            var matches = await SearchAsync(title, year, cancellationToken).ConfigureAwait(false);
             if (matches is [var match, ..] && match.TryGetKinopoiskId(out var kinopoiskId))
             {
-                Logger.LogInformation("Kinopoisk matched {Name} by '{Keyword}' as {Match} ({Id})", info.Name, keyword, match.Name, kinopoiskId);
+                Logger.LogInformation(
+                    "Kinopoisk matched {Name} by '{Title}' ({Year}) as {Match} ({Id})", info.Name, title, year, match.Name, kinopoiskId);
                 return kinopoiskId;
             }
         }

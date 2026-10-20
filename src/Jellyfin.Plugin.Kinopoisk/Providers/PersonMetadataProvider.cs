@@ -29,9 +29,9 @@ public sealed class PersonMetadataProvider : KinopoiskMetadataProvider<Person, P
     }
 
     /// <inheritdoc />
-    protected override async Task<IReadOnlyList<RemoteSearchResult>> SearchAsync(string keyword, CancellationToken cancellationToken)
+    protected override async Task<IReadOnlyList<RemoteSearchResult>> SearchAsync(string title, int? year, CancellationToken cancellationToken)
     {
-        var persons = await Client.SearchPersonsAsync(keyword, cancellationToken).ConfigureAwait(false);
+        var persons = await Client.SearchPersonsAsync(title, cancellationToken).ConfigureAwait(false);
         return [.. persons.Select(p => p.ToSearchResult())];
     }
 
@@ -44,11 +44,11 @@ public sealed class PersonMetadataProvider : KinopoiskMetadataProvider<Person, P
         => result.FillFrom(await Client.GetPersonAsync(kinopoiskId, cancellationToken).ConfigureAwait(false));
 
     /// <inheritdoc />
-    protected override IEnumerable<string> GetKeywords(PersonLookupInfo info)
+    protected override IEnumerable<(string Title, int? Year)> GetSearchTerms(PersonLookupInfo info)
     {
         if (!string.IsNullOrWhiteSpace(info.Name))
         {
-            yield return info.Name;
+            yield return (info.Name, null);
         }
     }
 }

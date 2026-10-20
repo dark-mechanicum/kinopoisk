@@ -21,15 +21,57 @@ public sealed class FilmApiLiveTests : IDisposable
     [Fact]
     public async Task SuggestSearch_FindsMatrixByTitleAndYear()
     {
-        var results = await Client.SearchFilmsAsync("Матрица 1999", _token);
+        var results = await Client.SearchFilmsAsync("Матрица", 1999, _token);
 
         var matrix = Assert.Single(results, f => f.Id == KnownTitles.MatrixId);
+        Assert.Same(matrix, results[0]);
         Assert.Equal("Матрица", matrix.Title?.Russian);
         Assert.Equal("The Matrix", matrix.Title?.Original);
         Assert.Equal(1999, matrix.Year);
         Assert.True(matrix.IsFilm);
         Assert.Equal(KnownTitles.MatrixContentId, matrix.ContentId);
     }
+
+    [Fact]
+    public async Task SuggestSearch_YearMovesTitleOfThatYearFirst()
+    {
+        var results = await Client.SearchFilmsAsync("Незнайка", 1961, _token);
+
+        Assert.Equal(KnownTitles.NeznaykaUchitsyaId, results[0].Id);
+    }
+
+    [Fact]
+    public async Task SuggestSearch_WrongYearStillFindsTitle()
+    {
+        // Kinopoisk itself finds nothing for "Незнайка учится 1962": the film is from 1961.
+        var results = await Client.SearchFilmsAsync("Незнайка учится", 1962, _token);
+
+        Assert.Contains(results, f => f.Id == KnownTitles.NeznaykaUchitsyaId);
+    }
+
+    [Fact]
+    public async Task GetTitle_ReturnsFilmWhenKinopoiskHasOne()
+    {
+        var title = await Client.GetTitleAsync(KnownTitles.MatrixId, _token);
+
+        Assert.True(title.IsFilm);
+        Assert.Equal("Матрица", title.Title?.Russian);
+    }
+
+    [Fact]
+    public async Task GetTitle_FallsBackToSeriesWhenKinopoiskHasNoSuchFilm()
+    {
+        var title = await Client.GetTitleAsync(KnownTitles.NeznaykaNaLuneId, _token);
+
+        Assert.False(title.IsFilm);
+        Assert.Equal(KnownTitles.NeznaykaNaLuneId, title.Id);
+        Assert.Equal("Незнайка на Луне", title.Title?.Russian);
+        Assert.Equal(1997, title.Year);
+    }
+
+    [Fact]
+    public async Task GetTitle_UnknownIdThrows()
+        => await Assert.ThrowsAsync<KinopoiskApiException>(() => Client.GetTitleAsync(KnownTitles.UnknownId, _token));
 
     [Fact]
     public async Task FilmBaseInfo_ReturnsFullMatrixMetadata()

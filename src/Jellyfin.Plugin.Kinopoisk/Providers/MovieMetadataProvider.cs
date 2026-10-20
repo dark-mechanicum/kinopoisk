@@ -30,19 +30,20 @@ public sealed class MovieMetadataProvider : KinopoiskMetadataProvider<Movie, Mov
     }
 
     /// <inheritdoc />
-    protected override async Task<IReadOnlyList<RemoteSearchResult>> SearchAsync(string keyword, CancellationToken cancellationToken)
+    protected override async Task<IReadOnlyList<RemoteSearchResult>> SearchAsync(string title, int? year, CancellationToken cancellationToken)
     {
-        var films = await Client.SearchFilmsAsync(keyword, cancellationToken).ConfigureAwait(false);
-        return [.. films.Where(f => f.IsFilm).Select(f => f.ToSearchResult())];
+        // Series are kept: Kinopoisk files some titles that libraries keep as movies (e.g. multi-part cartoons) as series.
+        var films = await Client.SearchFilmsAsync(title, year, cancellationToken).ConfigureAwait(false);
+        return [.. films.Select(f => f.ToSearchResult())];
     }
 
     /// <inheritdoc />
     protected override async Task<RemoteSearchResult> GetSearchResultByIdAsync(int kinopoiskId, CancellationToken cancellationToken)
-        => (await Client.GetFilmAsync(kinopoiskId, cancellationToken).ConfigureAwait(false)).ToSearchResult();
+        => (await Client.GetTitleAsync(kinopoiskId, cancellationToken).ConfigureAwait(false)).ToSearchResult();
 
     /// <inheritdoc />
     protected override async Task FillAsync(MetadataResult<Movie> result, int kinopoiskId, CancellationToken cancellationToken)
-        => result.FillFrom(await Client.GetFilmAsync(kinopoiskId, cancellationToken).ConfigureAwait(false));
+        => result.FillFrom(await Client.GetTitleAsync(kinopoiskId, cancellationToken).ConfigureAwait(false));
 
     /// <inheritdoc />
     protected override IEnumerable<string> GetPathNames(MovieInfo info)
@@ -63,16 +64,6 @@ public sealed class MovieMetadataProvider : KinopoiskMetadataProvider<Movie, Mov
     }
 
     /// <inheritdoc />
-    protected override IEnumerable<string> GetKeywords(MovieInfo info)
-    {
-        foreach (var keyword in base.GetKeywords(info))
-        {
-            yield return keyword;
-        }
-
-        foreach (var (title, year) in info.Path.ParseFileName())
-        {
-            yield return year is null ? title : $"{title} {year}";
-        }
-    }
+    protected override IEnumerable<(string Title, int? Year)> GetSearchTerms(MovieInfo info)
+        => base.GetSearchTerms(info).Concat(info.Path.ParseFileName());
 }

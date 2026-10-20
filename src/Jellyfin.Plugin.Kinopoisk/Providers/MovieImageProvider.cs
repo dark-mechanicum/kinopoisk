@@ -33,7 +33,7 @@ public sealed class MovieImageProvider : KinopoiskImageProvider<Movie>
     protected override async Task<IEnumerable<(ImageType Type, string? Url)>> CollectAsync(
         BaseItem item, int kinopoiskId, CancellationToken cancellationToken)
     {
-        var film = await Client.GetFilmAsync(kinopoiskId, cancellationToken).ConfigureAwait(false);
+        var film = await Client.GetTitleAsync(kinopoiskId, cancellationToken).ConfigureAwait(false);
         return await FilmImageCollector.CollectAsync(Client, film, cancellationToken).ConfigureAwait(false);
     }
 }

@@ -30,9 +30,9 @@ public sealed class SeriesMetadataProvider : KinopoiskMetadataProvider<Series, S
     }
 
     /// <inheritdoc />
-    protected override async Task<IReadOnlyList<RemoteSearchResult>> SearchAsync(string keyword, CancellationToken cancellationToken)
+    protected override async Task<IReadOnlyList<RemoteSearchResult>> SearchAsync(string title, int? year, CancellationToken cancellationToken)
     {
-        var films = await Client.SearchFilmsAsync(keyword, cancellationToken).ConfigureAwait(false);
+        var films = await Client.SearchFilmsAsync(title, year, cancellationToken).ConfigureAwait(false);
         return [.. films.Where(f => !f.IsFilm).Select(f => f.ToSearchResult())];
     }
 

@@ -22,7 +22,9 @@ ported to Jellyfin 12.2 / .NET 10 and reworked.
 | Person  | ✔        | ✔      | photos                    | ✔                 |
 
 - Movies without a Kinopoisk id are matched by name and year, then by file name
-  (`The.Matrix.1999.1080p.BluRay.mkv` → «Матрица»).
+  (`The.Matrix.1999.1080p.BluRay.mkv` → «Матрица»). The year only ranks the matches (titles released that year come
+  first), so a slightly wrong year never hides the right title.
+- A movie can also be matched to a title Kinopoisk lists as a series (e.g. multi-part cartoons like «Незнайка на Луне»).
 - An explicit Kinopoisk id in the file or folder name skips the search entirely — see below.
 - Episodes are matched by season/episode number: through the full season list for series on the Kinopoisk streaming
   service, otherwise among the 30 most recent episodes (a Kinopoisk API limit).

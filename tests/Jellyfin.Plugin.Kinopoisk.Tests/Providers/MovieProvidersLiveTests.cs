@@ -77,17 +77,56 @@ public sealed class MovieProvidersLiveTests : IDisposable
     }
 
     [Fact]
-    public async Task GetSearchResults_ByName_ReturnsOnlyFilms()
+    public async Task GetSearchResults_ByNameAndYear_PutsThatFilmFirst()
     {
         IRemoteMetadataProvider<Movie, MovieInfo> provider = _services.Create<MovieMetadataProvider>();
 
         var results = (await provider.GetSearchResults(new MovieInfo { Name = "Матрица", Year = 1999 }, _token)).ToList();
 
         var matrix = Assert.Single(results, r => r.TryGetKinopoiskId(out var id) && id == KnownTitles.MatrixId);
+        Assert.Same(matrix, results[0]);
         Assert.Equal("Матрица (The Matrix)", matrix.Name);
         Assert.Equal(1999, matrix.ProductionYear);
         Assert.StartsWith("https://", matrix.ImageUrl, StringComparison.Ordinal);
-        Assert.DoesNotContain(results, r => r.TryGetKinopoiskId(out var id) && id == KnownTitles.GameOfThronesId);
+    }
+
+    [Fact]
+    public async Task GetSearchResults_FindsTitleKinopoiskFilesAsSeries()
+    {
+        IRemoteMetadataProvider<Movie, MovieInfo> provider = _services.Create<MovieMetadataProvider>();
+
+        var results = (await provider.GetSearchResults(new MovieInfo { Name = "Незнайка на Луне", Year = 1997 }, _token)).ToList();
+
+        Assert.True(results[0].TryGetKinopoiskId(out var id));
+        Assert.Equal(KnownTitles.NeznaykaNaLuneId, id);
+    }
+
+    [Fact]
+    public async Task GetSearchResults_ByKinopoiskSeriesId_ReturnsThatSeries()
+    {
+        IRemoteMetadataProvider<Movie, MovieInfo> provider = _services.Create<MovieMetadataProvider>();
+        var info = new MovieInfo();
+        info.SetKinopoiskId(KnownTitles.NeznaykaNaLuneId);
+
+        var result = Assert.Single(await provider.GetSearchResults(info, _token));
+
+        Assert.Equal("Незнайка на Луне", result.Name);
+        Assert.Equal(1997, result.ProductionYear);
+    }
+
+    [Fact]
+    public async Task GetMetadata_ByKinopoiskSeriesId_FillsMovie()
+    {
+        IRemoteMetadataProvider<Movie, MovieInfo> provider = _services.Create<MovieMetadataProvider>();
+        var info = new MovieInfo();
+        info.SetKinopoiskId(KnownTitles.NeznaykaNaLuneId);
+
+        var result = await provider.GetMetadata(info, _token);
+
+        Assert.True(result.HasMetadata);
+        Assert.Equal("Незнайка на Луне", result.Item.Name);
+        Assert.Equal(1997, result.Item.ProductionYear);
+        Assert.False(string.IsNullOrWhiteSpace(result.Item.Overview));
     }
 
     [Fact]
@@ -121,6 +160,18 @@ public sealed class MovieProvidersLiveTests : IDisposable
         using var response = await provider.GetImageResponse(images[0].Url, _token);
         response.EnsureSuccessStatusCode();
         Assert.StartsWith("image/", response.Content.Headers.ContentType?.MediaType, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetImages_ForKinopoiskSeriesId_ReturnsPoster()
+    {
+        var provider = _services.Create<MovieImageProvider>();
+        var movie = new Movie();
+        movie.SetKinopoiskId(KnownTitles.NeznaykaNaLuneId);
+
+        var images = await provider.GetImages(movie, _token);
+
+        Assert.Contains(images, i => i.Type == ImageType.Primary);
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json.Serialization;
 using Jellyfin.Plugin.Kinopoisk.Common;
 using Jellyfin.Plugin.Kinopoisk.Extensions;
@@ -86,6 +87,26 @@ public sealed record FilmInfo : BaseMetadata
 
     /// <summary>Gets a value indicating whether this is a feature film rather than a series.</summary>
     public bool IsFilm => TypeName is null or FilmTypeName;
+
+    /// <summary>
+    /// Checks whether the film was produced, or the series was running, in a year.
+    /// </summary>
+    /// <param name="year">The year; when unknown nothing matches.</param>
+    /// <returns><c>true</c> when the year matches; a series without an end year is still running.</returns>
+    public bool IsReleasedIn(int? year)
+        => year is not null
+            && (ProductionYear == year || (ReleaseYears ?? []).Any(r => r.Start <= year && (r.End ?? int.MaxValue) >= year));
+
+    /// <summary>
+    /// Checks whether any of the titles (Russian, original, localized) equals a title, ignoring case.
+    /// </summary>
+    /// <param name="title">The title.</param>
+    /// <returns><c>true</c> when one of the titles matches.</returns>
+    public bool HasTitle(string title)
+    {
+        string?[] titles = [Title?.Russian, Title?.Original, Title?.Localized];
+        return titles.Any(t => string.Equals(t?.Trim(), title.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>
     /// Maps a Kinopoisk image category onto a Jellyfin image type.

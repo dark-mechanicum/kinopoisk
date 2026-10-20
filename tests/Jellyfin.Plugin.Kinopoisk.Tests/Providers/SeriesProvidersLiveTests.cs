@@ -49,6 +49,18 @@ public sealed class SeriesProvidersLiveTests : IDisposable
     }
 
     [Fact]
+    public async Task GetSearchResults_ByNameAndYear_PutsSeriesOfThatYearFirstAndSkipsFilms()
+    {
+        IRemoteMetadataProvider<Series, SeriesInfo> provider = _services.Create<SeriesMetadataProvider>();
+
+        var results = (await provider.GetSearchResults(new SeriesInfo { Name = "Незнайка на Луне", Year = 1997 }, _token)).ToList();
+
+        Assert.True(results[0].TryGetKinopoiskId(out var id));
+        Assert.Equal(KnownTitles.NeznaykaNaLuneId, id);
+        Assert.DoesNotContain(results, r => r.TryGetKinopoiskId(out var other) && other == KnownTitles.NeznaykaNaLune2Id);
+    }
+
+    [Fact]
     public async Task GetImages_ReturnsPostersAndBackdrops()
     {
         var provider = _services.Create<SeriesImageProvider>();

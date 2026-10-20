@@ -21,7 +21,7 @@ public sealed class SeriesAndPersonApiLiveTests : IDisposable
     [Fact]
     public async Task SuggestSearch_MarksSeriesAsNotFilm()
     {
-        var results = await Client.SearchFilmsAsync("Игра престолов", _token);
+        var results = await Client.SearchFilmsAsync("Игра престолов", null, _token);
 
         var series = Assert.Single(results, f => f.Id == KnownTitles.GameOfThronesId);
         Assert.False(series.IsFilm);

@@ -11,12 +11,13 @@ namespace Jellyfin.Plugin.Kinopoisk.Api;
 public interface IKinopoiskClient
 {
     /// <summary>
-    /// Searches films and series by keyword.
+    /// Searches films and series by title; the year only ranks the matches, it never filters them out.
     /// </summary>
-    /// <param name="keyword">The keyword, optionally followed by a year.</param>
+    /// <param name="title">The title.</param>
+    /// <param name="year">The year, if known.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>Matches, best first.</returns>
-    Task<IReadOnlyList<FilmInfo>> SearchFilmsAsync(string keyword, CancellationToken cancellationToken);
+    /// <returns>Matches, best first: released in that year, then with exactly that title, then in Kinopoisk order.</returns>
+    Task<IReadOnlyList<FilmInfo>> SearchFilmsAsync(string title, int? year, CancellationToken cancellationToken);
 
     /// <summary>
     /// Searches persons by keyword.
@@ -41,6 +42,14 @@ public interface IKinopoiskClient
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The series.</returns>
     Task<FilmInfo> GetSeriesAsync(int seriesId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets a film, or the series with that id when Kinopoisk has no such film.
+    /// </summary>
+    /// <param name="id">The Kinopoisk id.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The film or series.</returns>
+    Task<FilmInfo> GetTitleAsync(int id, CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets the streaming page of a film or series, which has the best artwork and the season list.
