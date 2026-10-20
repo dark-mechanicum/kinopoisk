@@ -9,9 +9,12 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
-  <!-- Overridden by CI from the release tag (e.g. v1.2.0.0 -> 1.2.0.0). -->
+  <!--
+    Plugin version = <Jellyfin major>.<minor>.<feature>.<fix>, e.g. 12.2.0.0 for Jellyfin 12.2.
+    Overridden by CI from the release tag (v12.2.1.0 -> 12.2.1.0).
+  -->
   <PropertyGroup>
-    <Version>1.0.0.0</Version>
+    <Version>12.2.0.0</Version>
     <AssemblyVersion>$(Version)</AssemblyVersion>
     <FileVersion>$(Version)</FileVersion>
   </PropertyGroup>

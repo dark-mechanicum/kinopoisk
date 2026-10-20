@@ -2,7 +2,8 @@
   <!--
     Versions mirror Jellyfin 12.2 so the plugin loads against exactly what the server ships:
     https://github.com/jellyfin/jellyfin/blob/v12.2/Directory.Packages.props
-    Bump them together with the Jellyfin.* packages.
+    Bump them together with the Jellyfin.* packages. A new Jellyfin minor version also moves the plugin
+    version line: update targetAbi in build.yaml and Version in Directory.Build.props (see README, Versioning).
   -->
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>

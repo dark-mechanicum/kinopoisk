@@ -1,7 +1,8 @@
 ---
 name: "КиноПоиск"
 guid: "9b3b77c3-61a9-43a0-bfea-0be2c473e8bd"
-targetAbi: "12.0.0.0"
+# Must be <Jellyfin major>.<minor>.0.0 of the Jellyfin.Controller package (checked by build/check-version.sh).
+targetAbi: "12.2.0.0"
 framework: "net10.0"
 owner: "dark-mechanicum"
 category: "Metadata"
