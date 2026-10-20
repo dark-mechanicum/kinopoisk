@@ -84,17 +84,29 @@ public sealed class SeriesProvidersLiveTests : IDisposable
     [InlineData(2, 1)]
     public async Task Episode_FromItsSeason_WhenSeriesIsOnStreamingService(int season, int episode)
     {
+        await StreamingCatalog.SkipUnlessAvailableAsync(_services.Client, _token);
         var provider = _services.Create<EpisodeMetadataProvider>();
-        var info = new EpisodeInfo { ParentIndexNumber = season, IndexNumber = episode };
-        info.SeriesProviderIds[Constants.KinopoiskIdKey] = KnownTitles.MetodId.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        info.SeriesProviderIds[Constants.ContentIdKey] = KnownTitles.MetodContentId;
 
-        var found = await provider.FindEpisodeAsync(info, _token);
+        var found = await provider.FindEpisodeAsync(MetodEpisode(season, episode), _token);
 
         Assert.NotNull(found);
         Assert.Equal(episode, found.Number);
         Assert.Equal(season, found.Season?.Number);
         Assert.False(string.IsNullOrWhiteSpace(found.Synopsis));
+    }
+
+    [Fact]
+    public async Task Episode_RecentEpisodeIsFoundWithOrWithoutStreamingCatalog()
+    {
+        // Season data when the streaming catalog is visible, otherwise the latest-episodes fallback.
+        var provider = _services.Create<EpisodeMetadataProvider>();
+
+        var found = await provider.FindEpisodeAsync(MetodEpisode(2, 1), _token);
+
+        Assert.NotNull(found);
+        Assert.Equal(1, found.Number);
+        Assert.Equal(2, found.Season?.Number);
+        Assert.True(found.Id > 0);
     }
 
     [Fact]
@@ -108,4 +120,12 @@ public sealed class SeriesProvidersLiveTests : IDisposable
     }
 
     public void Dispose() => _services.Dispose();
+
+    private static EpisodeInfo MetodEpisode(int season, int episode)
+    {
+        var info = new EpisodeInfo { ParentIndexNumber = season, IndexNumber = episode };
+        info.SeriesProviderIds[Constants.KinopoiskIdKey] = KnownTitles.MetodId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        info.SeriesProviderIds[Constants.ContentIdKey] = KnownTitles.MetodContentId;
+        return info;
+    }
 }

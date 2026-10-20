@@ -59,18 +59,17 @@ public sealed class SeriesAndPersonApiLiveTests : IDisposable
         var page = await Client.GetFilmPageAsync(KnownTitles.MetodContentId, _token);
 
         Assert.Equal(KnownTitles.MetodId, page.Id);
-        var first = Assert.Single(page.Seasons?.Items ?? [], s => s.Number == 1);
-        Assert.False(string.IsNullOrWhiteSpace(first.ContentId));
+        Assert.SkipUnless(page.Seasons?.Items is { Count: > 0 }, StreamingCatalog.UnavailableReason);
+        var first = Assert.Single(page.Seasons.Items, s => s.Number == 1);
+        Assert.Equal(KnownTitles.MetodSeason1ContentId, first.ContentId);
     }
 
     [Fact]
     public async Task SerialStructureSeason_ReturnsWholeSeason()
     {
-        var page = await Client.GetFilmPageAsync(KnownTitles.MetodContentId, _token);
-        var seasonContentId = page.Seasons!.Items!.First(s => s.Number == 1).ContentId!;
+        var episodes = await Client.GetSeasonEpisodesAsync(KnownTitles.MetodSeason1ContentId, _token);
 
-        var episodes = await Client.GetSeasonEpisodesAsync(seasonContentId, _token);
-
+        Assert.SkipWhen(episodes.Count == 0, StreamingCatalog.UnavailableReason);
         Assert.Equal(Enumerable.Range(1, 16), episodes.Select(e => e.Number));
         Assert.All(episodes, e => Assert.Equal(1, e.Season?.Number));
         Assert.All(episodes, e => Assert.False(string.IsNullOrWhiteSpace(e.Synopsis)));

@@ -21,6 +21,9 @@ public static class KnownTitles
     /// <summary>Content UUID of «Метод».</summary>
     public const string MetodContentId = "49635d28e64c834f8c7327ebd9e421a2";
 
+    /// <summary>Content UUID of season 1 of «Метод» (16 episodes).</summary>
+    public const string MetodSeason1ContentId = "406547c4784c613a96dadc9321e78afa";
+
     /// <summary>Keanu Reeves.</summary>
     public const int KeanuReevesId = 7836;
 
