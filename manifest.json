@@ -1,0 +1,12 @@
+[
+  {
+    "category": "Metadata",
+    "guid": "9b3b77c3-61a9-43a0-bfea-0be2c473e8bd",
+    "name": "КиноПоиск",
+    "overview": "Информация о фильмах, сериалах и персонах с КиноПоиска",
+    "description": "Загружает метаданные и изображения фильмов, сериалов, эпизодов и персон с КиноПоиска. Использует только API Яндекса, поэтому работает в сетях с «белым списком».",
+    "owner": "dark-mechanicum",
+    "imageUrl": "https://avatars.mds.yandex.net/get-vthumb/880526/8e310a4ac77a414a5fc3c20eba8bb6a1/800x450",
+    "versions": []
+  }
+]

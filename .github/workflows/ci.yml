@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Every day at 04:00 UTC: catch Kinopoisk API changes as early as possible.
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Kinopoisk.slnx
+
+      - name: Check formatting
+        run: dotnet format Kinopoisk.slnx --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build Kinopoisk.slnx --configuration Release --no-restore
+
+      - name: Test against the live Kinopoisk API
+        run: >
+          dotnet test Kinopoisk.slnx
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=results.trx"
+          --logger "console;verbosity=normal"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: TestResults
+
+      - name: Package plugin
+        run: ./build/package.sh "0.0.0.${{ github.run_number }}" artifacts
+
+      - name: Upload plugin
+        uses: actions/upload-artifact@v7
+        with:
+          name: jellyfin-plugin-kinopoisk
+          path: artifacts/*.zip
+
+  report-api-drift:
+    # Scheduled runs only test what is already on main, so a failure there means Kinopoisk changed.
+    needs: build-and-test
+    if: always() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open, update or close the API drift issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RESULT: ${{ needs.build-and-test.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="Kinopoisk API drift detected by the daily run"
+          gh label create api-drift --color B60205 --description "Kinopoisk API changed" 2>/dev/null || true
+          issue=$(gh issue list --label api-drift --state open --json number --jq '.[0].number // empty')
+
+          if [ "$RESULT" = "success" ]; then
+            if [ -n "$issue" ]; then
+              gh issue close "$issue" --comment "The daily run passed again: $RUN_URL"
+            fi
+            exit 0
+          fi
+
+          body="The daily live-API test run failed: $RUN_URL
+
+          Check the failed tests in the run log and the \`test-results\` artifact."
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body "Still failing: $RUN_URL"
+          else
+            gh issue create --title "$title" --label api-drift --body "$body"
+          fi

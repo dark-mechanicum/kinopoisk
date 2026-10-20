@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*.*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Read version
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag must look like v1.2.3.4, got $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "target_abi=$(sed -n 's/^targetAbi: *"\(.*\)"/\1/p' build.yaml)" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: dotnet build Kinopoisk.slnx --configuration Release -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Test against the live Kinopoisk API
+        run: dotnet test Kinopoisk.slnx --configuration Release --no-build --logger "console;verbosity=normal"
+
+      - name: Package plugin
+        id: package
+        run: |
+          zip=$(./build/package.sh "${{ steps.version.outputs.version }}" artifacts | tail -n 1)
+          echo "zip=$zip" >> "$GITHUB_OUTPUT"
+          echo "md5=$(md5sum "$zip" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "${{ steps.package.outputs.zip }}" --title "$GITHUB_REF_NAME" --generate-notes
+
+      - name: Publish version in manifest.json
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TARGET_ABI: ${{ steps.version.outputs.target_abi }}
+          MD5: ${{ steps.package.outputs.md5 }}
+          ZIP: ${{ steps.package.outputs.zip }}
+        run: |
+          set -euo pipefail
+          url="${{ github.server_url }}/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/$(basename "$ZIP")"
+          git fetch origin main
+          git checkout main
+          python3 build/update-manifest.py "$VERSION" "$url" "$MD5" "$TARGET_ABI" "See $GITHUB_REF_NAME release notes."
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "Publish $GITHUB_REF_NAME in manifest.json"
+          git push origin main

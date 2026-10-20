@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Jellyfin.Plugin.Kinopoisk</RootNamespace>
+    <AssemblyName>Jellyfin.Plugin.Kinopoisk</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Provided by the Jellyfin server at runtime: compile against them, never ship them. -->
+    <PackageReference Include="Jellyfin.Controller" ExcludeAssets="runtime" />
+    <PackageReference Include="Jellyfin.Model" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Extensions.Http" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Api\Queries\*.gql" />
+    <None Remove="Configuration\configPage.html" />
+    <EmbeddedResource Include="Configuration\configPage.html" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jellyfin.Plugin.Kinopoisk.Tests" />
+  </ItemGroup>
+
+</Project>

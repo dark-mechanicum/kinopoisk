@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Jellyfin.* only: Microsoft.Extensions.* and test packages must match the versions Jellyfin itself ships
+  # (see Directory.Packages.props), so they are bumped by hand together with the Jellyfin packages.
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-name: "Jellyfin.*"
+    groups:
+      jellyfin:
+        patterns: ["Jellyfin.*"]

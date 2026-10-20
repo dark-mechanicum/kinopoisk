@@ -1,0 +1,111 @@
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Jellyfin.Plugin.Kinopoisk.Common;
+using Jellyfin.Plugin.Kinopoisk.Extensions;
+using Jellyfin.Plugin.Kinopoisk.Providers;
+using MediaBrowser.Controller.Entities.TV;
+using MediaBrowser.Controller.Providers;
+using MediaBrowser.Model.Entities;
+using Xunit;
+
+namespace Jellyfin.Plugin.Kinopoisk.Tests.Providers;
+
+/// <summary>
+/// Series and episode providers end to end, against the live API.
+/// </summary>
+public sealed class SeriesProvidersLiveTests : IDisposable
+{
+    private readonly LiveServices _services = new();
+    private readonly CancellationToken _token = TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task GetMetadata_ByName_FindsAndFillsSeries()
+    {
+        IRemoteMetadataProvider<Series, SeriesInfo> provider = _services.Create<SeriesMetadataProvider>();
+
+        var result = await provider.GetMetadata(new SeriesInfo { Name = "Игра престолов", Year = 2011 }, _token);
+
+        Assert.True(result.HasMetadata);
+        Assert.True(result.Item.TryGetKinopoiskId(out var id));
+        Assert.Equal(KnownTitles.GameOfThronesId, id);
+        Assert.Equal("Игра престолов", result.Item.Name);
+        Assert.Equal(2011, result.Item.ProductionYear);
+        Assert.Equal("18+", result.Item.OfficialRating);
+        Assert.False(string.IsNullOrWhiteSpace(result.Item.GetProviderId(Constants.ContentIdKey)));
+        Assert.NotEmpty(result.People);
+    }
+
+    [Fact]
+    public async Task GetSearchResults_ByName_ReturnsOnlySeries()
+    {
+        IRemoteMetadataProvider<Series, SeriesInfo> provider = _services.Create<SeriesMetadataProvider>();
+
+        var results = (await provider.GetSearchResults(new SeriesInfo { Name = "Игра престолов" }, _token)).ToList();
+
+        Assert.Contains(results, r => r.TryGetKinopoiskId(out var id) && id == KnownTitles.GameOfThronesId);
+        Assert.DoesNotContain(results, r => r.TryGetKinopoiskId(out var id) && id == KnownTitles.MatrixId);
+    }
+
+    [Fact]
+    public async Task GetImages_ReturnsPostersAndBackdrops()
+    {
+        var provider = _services.Create<SeriesImageProvider>();
+        var series = new Series();
+        series.SetKinopoiskId(KnownTitles.GameOfThronesId);
+
+        var images = (await provider.GetImages(series, _token)).ToList();
+
+        Assert.Contains(images, i => i.Type == ImageType.Primary);
+        Assert.Contains(images, i => i.Type == ImageType.Backdrop);
+    }
+
+    [Fact]
+    public async Task Episode_FromLatestReleases_WhenSeriesHasNoSeasonContentIds()
+    {
+        IRemoteMetadataProvider<Episode, EpisodeInfo> provider = _services.Create<EpisodeMetadataProvider>();
+        var info = new EpisodeInfo { ParentIndexNumber = 8, IndexNumber = 6 };
+        info.SeriesProviderIds[Constants.KinopoiskIdKey] = KnownTitles.GameOfThronesId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        var result = await provider.GetMetadata(info, _token);
+
+        Assert.True(result.HasMetadata);
+        Assert.Equal("Железный Трон", result.Item.Name);
+        Assert.Equal("The Iron Throne", result.Item.OriginalTitle);
+        Assert.Equal(8, result.Item.ParentIndexNumber);
+        Assert.Equal(6, result.Item.IndexNumber);
+        Assert.Equal(2019, result.Item.ProductionYear);
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(1, 16)]
+    [InlineData(2, 1)]
+    public async Task Episode_FromItsSeason_WhenSeriesIsOnStreamingService(int season, int episode)
+    {
+        var provider = _services.Create<EpisodeMetadataProvider>();
+        var info = new EpisodeInfo { ParentIndexNumber = season, IndexNumber = episode };
+        info.SeriesProviderIds[Constants.KinopoiskIdKey] = KnownTitles.MetodId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        info.SeriesProviderIds[Constants.ContentIdKey] = KnownTitles.MetodContentId;
+
+        var found = await provider.FindEpisodeAsync(info, _token);
+
+        Assert.NotNull(found);
+        Assert.Equal(episode, found.Number);
+        Assert.Equal(season, found.Season?.Number);
+        Assert.False(string.IsNullOrWhiteSpace(found.Synopsis));
+    }
+
+    [Fact]
+    public async Task Episode_WithoutSeriesId_ReturnsEmptyResult()
+    {
+        IRemoteMetadataProvider<Episode, EpisodeInfo> provider = _services.Create<EpisodeMetadataProvider>();
+
+        var result = await provider.GetMetadata(new EpisodeInfo { ParentIndexNumber = 1, IndexNumber = 1 }, _token);
+
+        Assert.False(result.HasMetadata);
+    }
+
+    public void Dispose() => _services.Dispose();
+}

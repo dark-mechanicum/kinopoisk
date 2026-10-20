@@ -1,0 +1,107 @@
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Jellyfin.Plugin.Kinopoisk.Api;
+using Xunit;
+
+namespace Jellyfin.Plugin.Kinopoisk.Tests.Api;
+
+/// <summary>
+/// Contract tests of the series, episode and person queries against the live Kinopoisk API.
+/// A failure here means Kinopoisk changed and the plugin must follow.
+/// </summary>
+public sealed class SeriesAndPersonApiLiveTests : IDisposable
+{
+    private readonly LiveServices _services = new();
+    private readonly CancellationToken _token = TestContext.Current.CancellationToken;
+
+    private IKinopoiskClient Client => _services.Client;
+
+    [Fact]
+    public async Task SuggestSearch_MarksSeriesAsNotFilm()
+    {
+        var results = await Client.SearchFilmsAsync("Игра престолов", _token);
+
+        var series = Assert.Single(results, f => f.Id == KnownTitles.GameOfThronesId);
+        Assert.False(series.IsFilm);
+    }
+
+    [Fact]
+    public async Task TvSeriesBaseInfo_ReturnsGameOfThrones()
+    {
+        var series = await Client.GetSeriesAsync(KnownTitles.GameOfThronesId, _token);
+
+        Assert.Equal("Игра престолов", series.Title?.Russian);
+        Assert.Equal("Game of Thrones", series.Title?.Original);
+        Assert.Equal(2011, series.Year);
+        Assert.Contains(series.ReleaseYears ?? [], y => y is { Start: 2011, End: 2019 });
+        Assert.Contains(series.Genres, g => g.Name == "фэнтези");
+        Assert.Equal("18+", series.Restriction?.OfficialRating);
+        Assert.NotEmpty(series.Actors?.Items ?? []);
+        Assert.False(string.IsNullOrWhiteSpace(series.ContentId));
+    }
+
+    [Fact]
+    public async Task TvSeriesEpisodes_ReturnsFinale()
+    {
+        var episodes = await Client.GetLatestEpisodesAsync(KnownTitles.GameOfThronesId, _token);
+
+        var finale = Assert.Single(episodes, e => e is { Number: 6, Season.Number: 8 });
+        Assert.Equal("Железный Трон", finale.Title?.Russian);
+        Assert.Equal("The Iron Throne", finale.Title?.Original);
+        Assert.Equal("2019-05-19", finale.ReleaseDate?.Date);
+    }
+
+    [Fact]
+    public async Task FilmPage_ReturnsSeasonsWithContentIds()
+    {
+        var page = await Client.GetFilmPageAsync(KnownTitles.MetodContentId, _token);
+
+        Assert.Equal(KnownTitles.MetodId, page.Id);
+        var first = Assert.Single(page.Seasons?.Items ?? [], s => s.Number == 1);
+        Assert.False(string.IsNullOrWhiteSpace(first.ContentId));
+    }
+
+    [Fact]
+    public async Task SerialStructureSeason_ReturnsWholeSeason()
+    {
+        var page = await Client.GetFilmPageAsync(KnownTitles.MetodContentId, _token);
+        var seasonContentId = page.Seasons!.Items!.First(s => s.Number == 1).ContentId!;
+
+        var episodes = await Client.GetSeasonEpisodesAsync(seasonContentId, _token);
+
+        Assert.Equal(Enumerable.Range(1, 16), episodes.Select(e => e.Number));
+        Assert.All(episodes, e => Assert.Equal(1, e.Season?.Number));
+        Assert.All(episodes, e => Assert.False(string.IsNullOrWhiteSpace(e.Synopsis)));
+    }
+
+    [Fact]
+    public async Task SuggestSearch_FindsPerson()
+    {
+        var results = await Client.SearchPersonsAsync("Киану Ривз", _token);
+
+        var keanu = Assert.Single(results, p => p.Id == KnownTitles.KeanuReevesId);
+        Assert.Equal("Киану Ривз", keanu.Name);
+        Assert.Equal("Keanu Reeves", keanu.OriginalName);
+    }
+
+    [Fact]
+    public async Task PersonApi_ReturnsKeanuReeves()
+    {
+        var person = await Client.GetPersonAsync(KnownTitles.KeanuReevesId, _token);
+
+        Assert.Equal(KnownTitles.KeanuReevesId, person.Id);
+        Assert.Equal("Киану Ривз", person.Name);
+        Assert.Equal("Keanu Reeves", person.OriginalName);
+        Assert.Equal("1964-09-02", person.BirthDate);
+        Assert.False(string.IsNullOrWhiteSpace(person.BirthPlace));
+        Assert.Contains(person.GetArtwork(), i => i.Url is not null);
+    }
+
+    [Fact]
+    public async Task PersonApi_UnknownIdThrows()
+        => await Assert.ThrowsAsync<KinopoiskApiException>(() => Client.GetPersonAsync(KnownTitles.UnknownId, _token));
+
+    public void Dispose() => _services.Dispose();
+}
