@@ -70,8 +70,12 @@ public sealed class FilmApiLiveTests : IDisposable
     }
 
     [Fact]
-    public async Task GetTitle_UnknownIdThrows()
-        => await Assert.ThrowsAsync<KinopoiskApiException>(() => Client.GetTitleAsync(KnownTitles.UnknownId, _token));
+    public async Task GetTitle_UnknownIdThrowsNotFound()
+    {
+        var ex = await Assert.ThrowsAsync<KinopoiskApiException>(() => Client.GetTitleAsync(KnownTitles.UnknownId, _token));
+
+        Assert.Equal(KinopoiskErrorKind.NotFound, ex.Kind);
+    }
 
     [Fact]
     public async Task FilmBaseInfo_ReturnsFullMatrixMetadata()
@@ -86,7 +90,7 @@ public sealed class FilmApiLiveTests : IDisposable
         Assert.Contains(film.Genres, g => g.Name == "фантастика");
         Assert.Contains(film.Countries, c => c.Name == "США");
         Assert.Equal("R", film.Restriction?.OfficialRating);
-        Assert.InRange(film.Rating?.Community ?? 0, 7f, 10f);
+        Assert.InRange(film.Rating?.GetCommunity(RatingSource.Kinopoisk) ?? 0, 7f, 10f);
         Assert.InRange(film.Rating?.Critics ?? 0, 1f, 100f);
         Assert.Contains(film.Actors?.Items ?? [], m => m.Person?.Id == KnownTitles.KeanuReevesId);
         Assert.Contains(film.Directors?.Items ?? [], m => m.Person?.Id == KnownTitles.LanaWachowskiId);
@@ -100,6 +104,18 @@ public sealed class FilmApiLiveTests : IDisposable
         var ex = await Assert.ThrowsAsync<KinopoiskApiException>(() => Client.GetFilmAsync(KnownTitles.UnknownId, _token));
 
         Assert.Contains("There is no film", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(KinopoiskErrorKind.NotFound, ex.Kind);
+    }
+
+    [Fact]
+    public async Task FilmBaseInfo_ReturnsCinematographerAndDistributors()
+    {
+        var film = await Client.GetFilmAsync(KnownTitles.MatrixId, _token);
+
+        Assert.Contains(film.Operators?.Items ?? [], m => m.Person?.Id == KnownTitles.BillPopeId);
+        Assert.NotEmpty(film.Designers?.Items ?? []);
+        Assert.NotEmpty(film.Distribution?.CompanyNames ?? []);
+        Assert.Empty(film.VoiceOverActors?.Items ?? []);
     }
 
     [Fact]
@@ -124,7 +140,7 @@ public sealed class FilmApiLiveTests : IDisposable
         var images = await Client.GetImagesAsync(KnownTitles.MatrixId, type, _token);
 
         Assert.NotEmpty(images.Items ?? []);
-        Assert.All(images.Items ?? [], i => Assert.Equal(type, i.Type));
+        Assert.All(images.Items ?? [], i => Assert.Equal(type, i.Category));
         Assert.All(images.Items ?? [], i => Assert.StartsWith("https://", i.Image?.Url, StringComparison.Ordinal));
     }
 

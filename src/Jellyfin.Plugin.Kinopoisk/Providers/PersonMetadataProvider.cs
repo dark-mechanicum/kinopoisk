@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Kinopoisk.Api;
@@ -21,10 +20,10 @@ public sealed class PersonMetadataProvider : KinopoiskMetadataProvider<Person, P
     /// Initializes a new instance of the <see cref="PersonMetadataProvider"/> class.
     /// </summary>
     /// <param name="client">The Kinopoisk client.</param>
-    /// <param name="httpClientFactory">The HTTP client factory.</param>
+    /// <param name="imageDownloader">The image downloader.</param>
     /// <param name="logger">The logger.</param>
-    public PersonMetadataProvider(IKinopoiskClient client, IHttpClientFactory httpClientFactory, ILogger<PersonMetadataProvider> logger)
-        : base(client, httpClientFactory, logger)
+    public PersonMetadataProvider(IKinopoiskClient client, ImageDownloader imageDownloader, ILogger<PersonMetadataProvider> logger)
+        : base(client, imageDownloader, logger)
     {
     }
 

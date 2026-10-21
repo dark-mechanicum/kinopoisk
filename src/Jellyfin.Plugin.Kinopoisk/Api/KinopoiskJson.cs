@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Jellyfin.Plugin.Kinopoisk.Api.Models;
 
 namespace Jellyfin.Plugin.Kinopoisk.Api;
@@ -12,11 +12,13 @@ namespace Jellyfin.Plugin.Kinopoisk.Api;
 internal static class KinopoiskJson
 {
     private const int SnippetLength = 300;
+    private const string NotFoundErrorCode = "NotFoundError";
 
-    private static readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web)
-    {
-        Converters = { new JsonStringEnumConverter<FilmImageType>(JsonNamingPolicy.SnakeCaseUpper) },
-    };
+    // Kinopoisk adds enum values without notice, so API strings are never deserialized into closed enums.
+    private static readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web);
+
+    private static readonly Dictionary<string, FilmImageType> _imageTypesByLiteral =
+        Enum.GetValues<FilmImageType>().ToDictionary(ToLiteral, StringComparer.Ordinal);
 
     /// <summary>
     /// Gets the GraphQL enum literal of an image category, e.g. <c>FAN_ART</c>.
@@ -24,6 +26,14 @@ internal static class KinopoiskJson
     /// <param name="type">The category.</param>
     /// <returns>The literal.</returns>
     public static string ToLiteral(FilmImageType type) => JsonNamingPolicy.SnakeCaseUpper.ConvertName(type.ToString());
+
+    /// <summary>
+    /// Reads a GraphQL image category literal.
+    /// </summary>
+    /// <param name="literal">The literal, e.g. <c>FAN_ART</c>.</param>
+    /// <returns>The category, or null for a value the plugin does not know.</returns>
+    public static FilmImageType? ParseImageType(string? literal)
+        => literal is not null && _imageTypesByLiteral.TryGetValue(literal, out var type) ? type : null;
 
     /// <summary>
     /// Parses a response body.
@@ -49,22 +59,25 @@ internal static class KinopoiskJson
     }
 
     /// <summary>
-    /// Walks a dot separated path; the error explains what Kinopoisk said instead.
+    /// Walks a dot separated path; the error explains what Kinopoisk said instead and is
+    /// <see cref="KinopoiskErrorKind.NotFound"/> when Kinopoisk reports the requested entry as missing.
     /// </summary>
     /// <param name="root">The response root.</param>
     /// <param name="path">The path.</param>
     /// <returns>The element.</returns>
     public static JsonElement Walk(JsonElement root, string path)
     {
+        var segments = path.Split('.');
         var current = root;
-        foreach (var segment in path.Split('.'))
+        foreach (var segment in segments)
         {
             if (current.ValueKind != JsonValueKind.Object
                 || !current.TryGetProperty(segment, out current)
                 || current.ValueKind == JsonValueKind.Null)
             {
                 throw new KinopoiskApiException(
-                    $"Kinopoisk response has no '{path}' (missing '{segment}'). {DescribeErrors(root)}".TrimEnd());
+                    $"Kinopoisk response has no '{path}' (missing '{segment}'). {DescribeErrors(root)}".TrimEnd(),
+                    IsNotFound(root, segments) ? KinopoiskErrorKind.NotFound : KinopoiskErrorKind.Contract);
             }
         }
 
@@ -100,16 +113,37 @@ internal static class KinopoiskJson
 
     private static string DescribeErrors(JsonElement root)
     {
-        if (root.ValueKind != JsonValueKind.Object
-            || !root.TryGetProperty("errors", out var errors)
-            || errors.ValueKind != JsonValueKind.Array)
-        {
-            return string.Empty;
-        }
-
-        var messages = errors.EnumerateArray()
-            .Select(e => e.ValueKind == JsonValueKind.Object && e.TryGetProperty("message", out var m) ? m.GetString() : null)
-            .OfType<string>();
-        return "Errors: " + string.Join("; ", messages);
+        var messages = GetErrors(root)
+            .Select(e => e.TryGetProperty("message", out var m) ? m.GetString() : null)
+            .OfType<string>()
+            .ToList();
+        return messages.Count == 0 ? string.Empty : "Errors: " + string.Join("; ", messages);
     }
+
+    /// <summary>
+    /// Checks for a <c>NotFoundError</c> on the requested root field. Other fields of the same document may
+    /// legitimately be missing (e.g. <c>tvSeries</c> of a film), so only the requested one counts.
+    /// </summary>
+    private static bool IsNotFound(JsonElement root, string[] segments)
+    {
+        var field = segments is ["data", var requested, ..] ? requested : segments[0];
+        return GetErrors(root).Any(e =>
+            e.TryGetProperty("extensions", out var extensions)
+            && extensions.ValueKind == JsonValueKind.Object
+            && extensions.TryGetProperty("code", out var code)
+            && code.ValueKind == JsonValueKind.String
+            && code.GetString() == NotFoundErrorCode
+            && e.TryGetProperty("path", out var errorPath)
+            && errorPath.ValueKind == JsonValueKind.Array
+            && errorPath.GetArrayLength() > 0
+            && errorPath[0].ValueKind == JsonValueKind.String
+            && errorPath[0].GetString() == field);
+    }
+
+    private static IEnumerable<JsonElement> GetErrors(JsonElement root)
+        => root.ValueKind == JsonValueKind.Object
+            && root.TryGetProperty("errors", out var errors)
+            && errors.ValueKind == JsonValueKind.Array
+            ? errors.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Object)
+            : [];
 }

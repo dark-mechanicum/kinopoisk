@@ -35,6 +35,8 @@ public sealed class SeriesProvidersLiveTests : IDisposable
         Assert.Equal("18+", result.Item.OfficialRating);
         Assert.False(string.IsNullOrWhiteSpace(result.Item.GetProviderId(Constants.ContentIdKey)));
         Assert.NotEmpty(result.People);
+        Assert.Contains("HBO", result.Item.Studios);
+        Assert.Contains("Фэнтези", result.Item.Genres);
     }
 
     [Fact]
@@ -91,6 +93,7 @@ public sealed class SeriesProvidersLiveTests : IDisposable
     }
 
     [Theory]
+    [Trait("Category", StreamingCatalog.Category)]
     [InlineData(1, 1)]
     [InlineData(1, 16)]
     [InlineData(2, 1)]

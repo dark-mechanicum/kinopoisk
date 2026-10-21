@@ -3,6 +3,7 @@ using System.Linq;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.Kinopoisk.Api.Models;
 using Jellyfin.Plugin.Kinopoisk.Common;
+using Jellyfin.Plugin.Kinopoisk.Configuration;
 using Jellyfin.Plugin.Kinopoisk.Extensions;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
@@ -16,6 +17,11 @@ namespace Jellyfin.Plugin.Kinopoisk.Tests.Extensions;
 /// </summary>
 public sealed class MetadataMappingTests
 {
+    private const string PlaceholderUrl =
+        "https://cdnrmmhfbmozlswruhrk.svc.cdn.yandex.net/s3/kinopoisk-frontend/common-static/img/projector-logo/placeholder.svg";
+
+    private static readonly PluginConfiguration _defaults = new();
+
     [Theory]
     [InlineData("r", null, "R")]
     [InlineData("pg13", "age12", "PG-13")]
@@ -40,11 +46,88 @@ public sealed class MetadataMappingTests
         };
         var result = MetadataResultExtensions.CreateResult<Movie>();
 
-        result.FillFrom(film);
+        result.FillFrom(film, _defaults);
 
         var actor = Assert.Single(result.People);
         Assert.Equal("Актёр", actor.Name);
         Assert.Equal(PersonKind.Actor, actor.Type);
+        Assert.Null(actor.Role);
+    }
+
+    [Fact]
+    public void FillFrom_MapsOperatorsDesignersAndVoiceActorsWithRoles()
+    {
+        var film = new FilmInfo
+        {
+            Id = 1,
+            Operators = Crew(new FilmPerson { Id = 2, Name = "Билл Поуп" }),
+            Designers = Crew(new FilmPerson { Id = 3, Name = "Оуэн Патерсон" }),
+
+            // Kinopoisk sends dubbing actors with name null and the Russian name as the original one.
+            VoiceOverActors = Crew(new FilmPerson { Id = 4, OriginalName = "Всеволод Кузнецов" }),
+        };
+        var result = MetadataResultExtensions.CreateResult<Movie>();
+
+        result.FillFrom(film, _defaults);
+
+        Assert.Contains(result.People, p => p is { Name: "Билл Поуп", Type: PersonKind.Unknown, Role: "Оператор" });
+        Assert.Contains(result.People, p => p is { Name: "Оуэн Патерсон", Type: PersonKind.Artist, Role: "Художник" });
+        Assert.Contains(result.People, p => p is { Name: "Всеволод Кузнецов", Type: PersonKind.Actor, Role: "Озвучка" });
+    }
+
+    [Fact]
+    public void FillFrom_CapitalizesGenres()
+    {
+        var result = MetadataResultExtensions.CreateResult<Movie>();
+
+        result.FillFrom(new FilmInfo { Id = 1, Genres = [new FilmNamedEntity("фантастика"), new FilmNamedEntity("для взрослых")] }, _defaults);
+
+        Assert.Equal(["Фантастика", "Для взрослых"], result.Item.Genres);
+    }
+
+    [Fact]
+    public void FillFrom_KeepsGenreCaseWhenDisabled()
+    {
+        var result = MetadataResultExtensions.CreateResult<Movie>();
+
+        result.FillFrom(new FilmInfo { Id = 1, Genres = [new FilmNamedEntity("фантастика")] }, new PluginConfiguration { CapitalizeGenres = false });
+
+        Assert.Equal(["фантастика"], result.Item.Genres);
+    }
+
+    [Fact]
+    public void FillFrom_AddsDistributorsAsStudiosOnce()
+    {
+        var film = new FilmInfo
+        {
+            Id = 1,
+            Distribution = new FilmDistribution(
+                Originals: Releases("HBO"),
+                RusRelease: Releases("Каро-Премьер", " ", null),
+                ReRelease: Releases("hbo", "Маурис Филм")),
+        };
+        var result = MetadataResultExtensions.CreateResult<Movie>();
+
+        result.FillFrom(film, _defaults);
+
+        Assert.Equal(["HBO", "Каро-Премьер", "Маурис Филм"], result.Item.Studios);
+    }
+
+    [Theory]
+    [InlineData(RatingSource.Kinopoisk, true, true, 8.5f)]
+    [InlineData(RatingSource.Imdb, true, true, 8.7f)]
+    [InlineData(RatingSource.Imdb, true, false, 8.5f)]
+    [InlineData(RatingSource.Kinopoisk, false, true, 8.7f)]
+    [InlineData(RatingSource.Kinopoisk, false, false, null)]
+    public void CommunityRating_PrefersChosenSourceAndFallsBack(RatingSource source, bool kinopoiskActive, bool imdbActive, float? expected)
+    {
+        var rating = new FilmRating
+        {
+            Kinopoisk = new FilmRatingValue { Value = 8.5f, IsActive = kinopoiskActive },
+            Imdb = new FilmRatingValue { Value = 8.7f, IsActive = imdbActive },
+        };
+
+        Assert.Equal(expected, rating.GetCommunity(source));
     }
 
     [Fact]
@@ -52,7 +135,7 @@ public sealed class MetadataMappingTests
     {
         var result = MetadataResultExtensions.CreateResult<Movie>();
 
-        result.FillFrom(new FilmInfo { Id = 5, ContentId = string.Empty });
+        result.FillFrom(new FilmInfo { Id = 5, ContentId = string.Empty }, _defaults);
 
         Assert.False(result.Item.TryGetContentId(out _));
         Assert.True(result.Item.TryGetKinopoiskId(out var id) && id == 5);
@@ -89,7 +172,43 @@ public sealed class MetadataMappingTests
             Imdb = new FilmRatingValue { Value = 7.5f, IsActive = true },
         };
 
-        Assert.Equal(7.5f, rating.Community);
+        Assert.Equal(7.5f, rating.GetCommunity(RatingSource.Kinopoisk));
+    }
+
+    [Theory]
+    [InlineData(PlaceholderUrl, true)]
+    [InlineData("https://st.kp.yandex.net/images/no-poster.gif", true)]
+    [InlineData("https://host/logo.SVG", true)]
+    [InlineData("https://avatars.mds.yandex.net/get-kinopoisk-image/1/abc/576x", false)]
+    [InlineData(null, false)]
+    public void IsPlaceholder_DetectsKinopoiskPlaceholders(string? url, bool expected)
+        => Assert.Equal(expected, Image.IsPlaceholder(url));
+
+    [Fact]
+    public void FilmPerson_PlaceholderPhotoGivesNoArtworkAndNoSearchImage()
+    {
+        var person = new FilmPerson
+        {
+            Id = 544474,
+            Name = "Холли Барио",
+            Img = new PersonImages(new PersonScaledImage(PlaceholderUrl, PlaceholderUrl)),
+        };
+
+        Assert.DoesNotContain(person.GetArtwork(), i => i.Url is not null);
+        Assert.Null(person.ToSearchResult().ImageUrl);
+    }
+
+    [Fact]
+    public void FilmInfo_PlaceholderPosterGivesNoSearchImage()
+    {
+        var film = new FilmInfo
+        {
+            Id = 1,
+            Gallery = new FilmGallery(Posters: new FilmGalleryImages { Vertical = new Image { AvatarsUrl = "//st.kp.yandex.net/images/no-poster.gif" } }),
+        };
+
+        Assert.Null(film.ToSearchResult().ImageUrl);
+        Assert.DoesNotContain(film.GetArtwork(), i => i.Url is not null);
     }
 
     [Theory]
@@ -127,4 +246,9 @@ public sealed class MetadataMappingTests
         Assert.Equal(Constants.ProviderName, film.ToSearchResult().SearchProviderName);
         Assert.DoesNotContain(new FilmInfo().GetArtwork(), i => i.Url is not null);
     }
+
+    private static FilmCrewMembers Crew(FilmPerson person) => new([new FilmCrewMember(person)]);
+
+    private static FilmReleaseList Releases(params string?[] companies)
+        => new([new FilmRelease([.. companies.Select(c => new FilmCompany(c))])]);
 }

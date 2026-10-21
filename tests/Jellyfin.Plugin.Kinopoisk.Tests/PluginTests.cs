@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using Jellyfin.Plugin.Kinopoisk.Common;
+using Jellyfin.Plugin.Kinopoisk.Configuration;
 using Jellyfin.Plugin.Kinopoisk.Providers;
 using MediaBrowser.Controller.Providers;
 using Xunit;
@@ -23,12 +24,18 @@ public sealed class PluginTests
     [Fact]
     public void ConfigPage_IsEmbedded()
     {
-        var resource = $"{typeof(Plugin).Namespace}.Configuration.configPage.html";
-        using var stream = typeof(Plugin).Assembly.GetManifestResourceStream(resource);
+        Assert.Contains("pluginConfigurationPage", ReadConfigPage(), StringComparison.Ordinal);
+    }
 
-        Assert.NotNull(stream);
-        using var reader = new StreamReader(stream);
-        Assert.Contains("pluginConfigurationPage", reader.ReadToEnd(), StringComparison.Ordinal);
+    [Fact]
+    public void ConfigPage_HasFieldForEveryOptionAndUsesPluginGuid()
+    {
+        var page = ReadConfigPage();
+
+        Assert.Contains(Constants.PluginGuid, page, StringComparison.Ordinal);
+        Assert.All(
+            typeof(IKinopoiskOptions).GetProperties(),
+            option => Assert.Contains($"id=\"{option.Name}\"", page, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -50,5 +57,14 @@ public sealed class PluginTests
         Assert.Contains(typeof(PersonImageProvider), exported);
         Assert.Contains(typeof(KinopoiskExternalUrlProvider), exported);
         Assert.Contains(typeof(PluginServiceRegistrator), exported);
+    }
+
+    private static string ReadConfigPage()
+    {
+        var resource = $"{typeof(Plugin).Namespace}.Configuration.configPage.html";
+        using var stream = typeof(Plugin).Assembly.GetManifestResourceStream(resource);
+        Assert.NotNull(stream);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 }

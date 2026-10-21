@@ -44,4 +44,10 @@ public static class Constants
     /// The public Kinopoisk site.
     /// </summary>
     public const string SiteUrl = "https://www.kinopoisk.ru";
+
+    /// <summary>
+    /// Yandex city id sent with search suggestions: Moscow, as the kinopoisk.ru web client sends.
+    /// Without it Kinopoisk intermittently answers with no suggestions at all.
+    /// </summary>
+    public const int YandexCityId = 213;
 }

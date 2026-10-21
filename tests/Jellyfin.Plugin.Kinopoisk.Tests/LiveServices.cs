@@ -2,7 +2,7 @@ using System;
 using System.Net.Http;
 using Jellyfin.Plugin.Kinopoisk.Api;
 using Jellyfin.Plugin.Kinopoisk.Common;
-using MediaBrowser.Common.Net;
+using Jellyfin.Plugin.Kinopoisk.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Jellyfin.Plugin.Kinopoisk.Tests;
@@ -15,14 +15,21 @@ public sealed class LiveServices : IDisposable
 {
     private readonly ServiceProvider _provider;
 
-    public LiveServices()
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LiveServices"/> class.
+    /// </summary>
+    /// <param name="options">Settings to use instead of the defaults.</param>
+    public LiveServices(IKinopoiskOptions? options = null)
     {
         var services = new ServiceCollection()
             .AddLogging()
             .AddMemoryCache();
 
-        // Registered by Jellyfin's ApplicationHost in production.
-        services.AddHttpClient(NamedClient.Default);
+        if (options is not null)
+        {
+            services.AddSingleton(options);
+        }
+
         services.AddKinopoisk();
 
         _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
@@ -33,6 +40,8 @@ public sealed class LiveServices : IDisposable
     public KinopoiskTransport Transport => _provider.GetRequiredService<KinopoiskTransport>();
 
     public IHttpClientFactory HttpClientFactory => _provider.GetRequiredService<IHttpClientFactory>();
+
+    public IServiceProvider Services => _provider;
 
     /// <summary>
     /// Creates a plugin type (provider) with its real dependencies.

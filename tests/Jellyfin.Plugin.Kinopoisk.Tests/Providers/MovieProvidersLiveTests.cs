@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.Kinopoisk.Common;
+using Jellyfin.Plugin.Kinopoisk.Configuration;
 using Jellyfin.Plugin.Kinopoisk.Extensions;
 using Jellyfin.Plugin.Kinopoisk.Providers;
 using MediaBrowser.Controller.Entities.Movies;
@@ -41,13 +42,29 @@ public sealed class MovieProvidersLiveTests : IDisposable
         Assert.Equal(1999, movie.ProductionYear);
         Assert.Equal(new DateTime(1999, 3, 24, 0, 0, 0, DateTimeKind.Utc), movie.PremiereDate);
         Assert.Equal("R", movie.OfficialRating);
-        Assert.Contains("фантастика", movie.Genres);
+        Assert.Contains("Фантастика", movie.Genres);
         Assert.Contains("США", movie.ProductionLocations);
+        Assert.NotEmpty(movie.Studios);
         Assert.Equal(KnownTitles.MatrixContentId, movie.GetProviderId(Constants.ContentIdKey));
         Assert.True(movie.TryGetKinopoiskId(out var id) && id == KnownTitles.MatrixId);
         Assert.Contains(result.People, p => p.Type == PersonKind.Actor && p.Name == "Киану Ривз");
         Assert.Contains(result.People, p => p.Type == PersonKind.Director && p.Name == "Лана Вачовски");
+        Assert.Contains(result.People, p => p.Role == "Оператор" && p.Name == "Билл Поуп");
+        Assert.DoesNotContain(result.People, p => p.Role == "Озвучка");
         Assert.All(result.People, p => Assert.True(p.TryGetKinopoiskId(out _)));
+    }
+
+    [Fact]
+    public async Task GetMetadata_WithVoiceActorsEnabled_AddsVoiceCast()
+    {
+        using var services = new LiveServices(new PluginConfiguration { IncludeVoiceActors = true });
+        IRemoteMetadataProvider<Movie, MovieInfo> provider = services.Create<MovieMetadataProvider>();
+        var info = new MovieInfo();
+        info.SetKinopoiskId(KnownTitles.MatrixId);
+
+        var result = await provider.GetMetadata(info, _token);
+
+        Assert.Contains(result.People, p => p is { Type: PersonKind.Actor, Role: "Озвучка" } && !string.IsNullOrWhiteSpace(p.Name));
     }
 
     [Fact]

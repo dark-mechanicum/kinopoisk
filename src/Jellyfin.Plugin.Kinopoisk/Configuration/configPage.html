@@ -5,7 +5,7 @@
     <title>КиноПоиск</title>
 </head>
 <body>
-    <div id="kinopoiskConfigPage" data-role="page" class="page type-interior pluginConfigurationPage">
+    <div id="kinopoiskConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
         <div data-role="content">
             <div class="content-primary">
                 <h1>КиноПоиск</h1>
@@ -15,9 +15,51 @@
                     работает и в сетях с «белым списком».
                 </p>
                 <p>
-                    Настроек нет: включите провайдер «КиноПоиск» в параметрах медиатеки
-                    и поднимите его выше остальных, если нужны русские названия и описания.
+                    Включите провайдер «КиноПоиск» в параметрах медиатеки и поднимите его выше остальных,
+                    если нужны русские названия и описания. Изменения применяются в течение часа (кэш ответов)
+                    и к уже загруженным элементам — после «Заменить все метаданные».
                 </p>
+
+                <form id="kinopoiskConfigForm">
+                    <div class="inputContainer">
+                        <input is="emby-input" type="number" id="CrewLimit" min="1" max="200" required label="Сколько актёров загружать (1–200)" />
+                    </div>
+                    <div class="selectContainer">
+                        <select is="emby-select" id="CommunityRating" label="Рейтинг зрителей">
+                            <option value="Kinopoisk">КиноПоиск (IMDb, если нет)</option>
+                            <option value="Imdb">IMDb (КиноПоиск, если нет)</option>
+                        </select>
+                    </div>
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="CapitalizeGenres" />
+                            <span>Жанры с заглавной буквы («Фантастика» вместо «фантастика»)</span>
+                        </label>
+                    </div>
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="IncludeVoiceActors" />
+                            <span>Добавлять актёров дубляжа (роль «Озвучка»)</span>
+                        </label>
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="number" id="MinRequestIntervalMs" min="0" max="5000" required label="Пауза между запросами к КиноПоиску, мс (0–5000)" />
+                        <div class="fieldDescription">Увеличьте, если КиноПоиск отвечает «429 Too Many Requests».</div>
+                    </div>
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="PreferIpv4" />
+                            <span>Подключаться сначала по IPv4</span>
+                        </label>
+                        <div class="fieldDescription">Помогает, если IPv6 в сети не работает и картинки не загружаются.</div>
+                    </div>
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block">
+                            <span>Сохранить</span>
+                        </button>
+                    </div>
+                </form>
+
                 <p>
                     <a is="emby-linkbutton" class="button-link" href="https://github.com/dark-mechanicum/kinopoisk" target="_blank" rel="noopener">
                         github.com/dark-mechanicum/kinopoisk
@@ -25,6 +67,37 @@
                 </p>
             </div>
         </div>
+        <script type="text/javascript">
+            (function () {
+                var pluginId = '9b3b77c3-61a9-43a0-bfea-0be2c473e8bd';
+                var page = document.querySelector('#kinopoiskConfigPage');
+                var numbers = ['CrewLimit', 'MinRequestIntervalMs'];
+                var flags = ['CapitalizeGenres', 'IncludeVoiceActors', 'PreferIpv4'];
+
+                page.addEventListener('pageshow', function () {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        numbers.forEach(function (id) { page.querySelector('#' + id).value = config[id]; });
+                        flags.forEach(function (id) { page.querySelector('#' + id).checked = config[id]; });
+                        page.querySelector('#CommunityRating').value = config.CommunityRating;
+                        Dashboard.hideLoadingMsg();
+                    });
+                });
+
+                page.querySelector('#kinopoiskConfigForm').addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        numbers.forEach(function (id) { config[id] = parseInt(page.querySelector('#' + id).value, 10); });
+                        flags.forEach(function (id) { config[id] = page.querySelector('#' + id).checked; });
+                        config.CommunityRating = page.querySelector('#CommunityRating').value;
+                        ApiClient.updatePluginConfiguration(pluginId, config).then(Dashboard.processPluginConfigurationUpdateResult);
+                    });
+                    return false;
+                });
+            })();
+        </script>
     </div>
 </body>
 </html>
+

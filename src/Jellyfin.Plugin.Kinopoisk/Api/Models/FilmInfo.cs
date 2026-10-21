@@ -52,6 +52,18 @@ public sealed record FilmInfo : BaseMetadata
     /// <summary>Gets the film editors.</summary>
     public FilmCrewMembers? FilmEditors { get; init; }
 
+    /// <summary>Gets the cinematographers.</summary>
+    public FilmCrewMembers? Operators { get; init; }
+
+    /// <summary>Gets the production, art and costume designers.</summary>
+    public FilmCrewMembers? Designers { get; init; }
+
+    /// <summary>Gets the dubbing actors (only fetched when enabled in the settings).</summary>
+    public FilmCrewMembers? VoiceOverActors { get; init; }
+
+    /// <summary>Gets the release and distribution data.</summary>
+    public FilmDistribution? Distribution { get; init; }
+
     /// <summary>Gets the production year.</summary>
     public int? ProductionYear { get; init; }
 

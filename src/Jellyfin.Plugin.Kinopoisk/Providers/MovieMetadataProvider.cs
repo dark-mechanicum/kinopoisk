@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Kinopoisk.Api;
+using Jellyfin.Plugin.Kinopoisk.Configuration;
 using Jellyfin.Plugin.Kinopoisk.Extensions;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Providers;
@@ -18,15 +18,20 @@ namespace Jellyfin.Plugin.Kinopoisk.Providers;
 /// </summary>
 public sealed class MovieMetadataProvider : KinopoiskMetadataProvider<Movie, MovieInfo>
 {
+    private readonly IKinopoiskOptions _options;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="MovieMetadataProvider"/> class.
     /// </summary>
     /// <param name="client">The Kinopoisk client.</param>
-    /// <param name="httpClientFactory">The HTTP client factory.</param>
+    /// <param name="imageDownloader">The image downloader.</param>
+    /// <param name="options">The plugin options.</param>
     /// <param name="logger">The logger.</param>
-    public MovieMetadataProvider(IKinopoiskClient client, IHttpClientFactory httpClientFactory, ILogger<MovieMetadataProvider> logger)
-        : base(client, httpClientFactory, logger)
+    public MovieMetadataProvider(
+        IKinopoiskClient client, ImageDownloader imageDownloader, IKinopoiskOptions options, ILogger<MovieMetadataProvider> logger)
+        : base(client, imageDownloader, logger)
     {
+        _options = options;
     }
 
     /// <inheritdoc />
@@ -43,7 +48,7 @@ public sealed class MovieMetadataProvider : KinopoiskMetadataProvider<Movie, Mov
 
     /// <inheritdoc />
     protected override async Task FillAsync(MetadataResult<Movie> result, int kinopoiskId, CancellationToken cancellationToken)
-        => result.FillFrom(await Client.GetTitleAsync(kinopoiskId, cancellationToken).ConfigureAwait(false));
+        => result.FillFrom(await Client.GetTitleAsync(kinopoiskId, cancellationToken).ConfigureAwait(false), _options);
 
     /// <inheritdoc />
     protected override IEnumerable<string> GetPathNames(MovieInfo info)
