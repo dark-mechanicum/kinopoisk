@@ -56,6 +56,40 @@ public sealed class StringExtensionsTests
     public void ParseFileName_UsesOnlyFileNameNotDirectories()
         => Assert.All("/media/Фильмы 2020/Матрица.1999.mkv".ParseFileName(), c => Assert.DoesNotContain("Фильмы", c.Title, System.StringComparison.Ordinal));
 
+    [Fact]
+    public void ParseFileName_BracketedAlternativeTitleIsAnExtraCandidate()
+    {
+        var candidates = "Кровь машин [Blood Machines] (2019) [1080p] [x264] [2ru, en].mkv".ParseFileName();
+
+        Assert.Equal(("Кровь машин", 2019), candidates[0]);
+        Assert.Contains(("Blood Machines", 2019), candidates);
+        Assert.DoesNotContain(candidates, c => c.Title.Contains("1080p", System.StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ParseFileName_TrackerTagInBracketsIsDropped()
+        => Assert.Contains(("Erin Brokovich", null), "Erin_Brokovich_[torrents.ru].avi".ParseFileName());
+
+    [Theory]
+    [InlineData("Film.2019.WEB-DL.1080p.EniaHD.mkv", "Film", 2019)]
+    [InlineData("Дюна.2021.WEB-DL.2160p.HDR.DDP5.1.Atmos-EniaHD.mkv", "Дюна", 2021)]
+    [InlineData("Солярис.1972.BDRip.rus.eng.mkv", "Солярис", 1972)]
+    public void ParseFileName_ReleaseTagsAndTrailingGroupAreRemoved(string path, string title, int? year)
+        => AssertPosition(path, title, year, 0);
+
+    [Fact]
+    public void ParseFileName_ReleaseGroupWithoutYearIsRemoved()
+        => Assert.Contains(("Film", null), "Film.WEB-DL.1080p.EniaHD.mkv".ParseFileName());
+
+    [Theory]
+    [InlineData("фантастика", "Фантастика")]
+    [InlineData("для взрослых", "Для взрослых")]
+    [InlineData("Драма", "Драма")]
+    [InlineData("ёлки", "Ёлки")]
+    [InlineData("", "")]
+    public void ToGenreName_CapitalizesFirstLetterOnly(string name, string expected)
+        => Assert.Equal(expected, name.ToGenreName());
+
     private static void AssertPosition(string path, string title, int? year, int expectedPosition)
     {
         var candidates = path.ParseFileName().ToList();

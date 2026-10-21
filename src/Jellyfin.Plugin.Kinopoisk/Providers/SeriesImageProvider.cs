@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Kinopoisk.Api;
@@ -19,10 +18,10 @@ public sealed class SeriesImageProvider : KinopoiskImageProvider<Series>
     /// Initializes a new instance of the <see cref="SeriesImageProvider"/> class.
     /// </summary>
     /// <param name="client">The Kinopoisk client.</param>
-    /// <param name="httpClientFactory">The HTTP client factory.</param>
+    /// <param name="imageDownloader">The image downloader.</param>
     /// <param name="logger">The logger.</param>
-    public SeriesImageProvider(IKinopoiskClient client, IHttpClientFactory httpClientFactory, ILogger<SeriesImageProvider> logger)
-        : base(client, httpClientFactory, logger)
+    public SeriesImageProvider(IKinopoiskClient client, ImageDownloader imageDownloader, ILogger<SeriesImageProvider> logger)
+        : base(client, imageDownloader, logger)
     {
     }
 

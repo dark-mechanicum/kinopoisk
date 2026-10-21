@@ -12,10 +12,25 @@ the Russian white-listed internet, where third-party Kinopoisk APIs are unreacha
 Based on [MiklinMA/jellyfin-kinopoisk-white](https://github.com/MiklinMA/jellyfin-kinopoisk-white) (GPL-3.0),
 ported to Jellyfin 12.2 / .NET 10 and reworked.
 
+## Installation
+
+### From the plugin repository
+
+1. Dashboard → Plugins → Repositories → add
+   `https://raw.githubusercontent.com/dark-mechanicum/kinopoisk/main/manifest.json`.
+2. Catalogue → «КиноПоиск» → Install, then restart Jellyfin.
+3. In the library settings enable the «КиноПоиск» metadata and image fetchers and move them to the top.
+
+### Manually (offline)
+
+Download `jellyfin-plugin-kinopoisk_<version>.zip` matching your Jellyfin version (`12.2.X.Y` for Jellyfin 12.2) from
+[Releases](https://github.com/dark-mechanicum/kinopoisk/releases), unpack it into
+`<jellyfin data>/plugins/Kinopoisk_<version>/` and restart Jellyfin.
+
 ## Features
 
 | Item    | Metadata | Search | Images                    | kinopoisk.ru link |
-|---------|----------|--------|---------------------------|-------------------|
+| ------- | -------- | ------ | ------------------------- | ----------------- |
 | Movie   | ✔        | ✔      | posters, backdrops, logos | ✔                 |
 | Series  | ✔        | ✔      | posters, backdrops, logos | ✔                 |
 | Episode | ✔        | ✔      | —                         | —                 |
@@ -28,7 +43,36 @@ ported to Jellyfin 12.2 / .NET 10 and reworked.
 - An explicit Kinopoisk id in the file or folder name skips the search entirely — see below.
 - Episodes are matched by season/episode number: through the full season list for series on the Kinopoisk streaming
   service, otherwise among the 30 most recent episodes (a Kinopoisk API limit).
-- Responses are cached for an hour; requests are sent one at a time.
+- Cast & crew include cinematographers (role «Оператор», shown under Crew — Jellyfin has no cinematographer kind) and
+  designers («Художник»); dubbing actors («Озвучка») on request.
+- Studios are the networks and distributors Kinopoisk lists (e.g. «HBO», «Каро-Премьер»); Kinopoisk's API exposes no
+  production companies to these endpoints.
+- Genres get a capital first letter («Фантастика»), so they merge with genres from other providers. Items fetched before
+  12.2.2.0 keep the lowercase genres until a «Replace all metadata» refresh.
+- Kinopoisk's "no photo" placeholders are never saved as images.
+- Responses are cached for an hour; requests are sent one at a time and retried with backoff on 429, 5xx, timeouts and
+  network errors. An outdated Kinopoisk id is logged as one warning line, not as an error.
+
+### Not supported
+
+- **Lookup by IMDb / TMDb id.** No Yandex endpoint reachable behind the white list resolves an external id (search for
+  `tt0133093` finds nothing). Use a `kp…` tag in the name instead.
+- **Trailers.** Kinopoisk gives either a trailer page (Jellyfin cannot play an HTML page) or a signed stream URL that
+  expires within days and exists only for some titles.
+
+## Settings
+
+Dashboard → Plugins → «КиноПоиск». Defaults keep the behaviour of earlier releases. Changes apply to new requests;
+cached responses expire within an hour.
+
+| Setting                             | Default   | Effect                                                                   |
+| ----------------------------------- | --------- | ------------------------------------------------------------------------ |
+| Actors to fetch (1–200)             | 30        | Size of the cast list (and of the dubbing cast).                         |
+| Community rating                    | Kinopoisk | Kinopoisk or IMDb rating first; the other is the fallback.               |
+| Capitalize genres                   | on        | «Фантастика» instead of «фантастика».                                    |
+| Dubbing actors                      | off       | Adds the Russian voice cast with role «Озвучка».                         |
+| Pause between requests, ms (0–5000) | 0         | Raise it if Kinopoisk answers `429 Too Many Requests` during big scans.  |
+| Prefer IPv4                         | off       | Connects over IPv4 first; helps when IPv6 is broken and images time out. |
 
 ## Kinopoisk id in file and folder names
 
@@ -48,21 +92,6 @@ Accepted forms: `kp301`, `kp-301`, `kp_301`, `kp=301`, `kpid-301`, `kinopoisk-30
 - An id in the name **wins over the id stored on the item**, so renaming a folder fixes a wrong match on the next metadata
   refresh. If Kinopoisk does not know the id, the item gets no metadata rather than a guess by name.
 - Episodes use the id of their series.
-
-## Installation
-
-### From the plugin repository
-
-1. Dashboard → Plugins → Repositories → add
-   `https://raw.githubusercontent.com/dark-mechanicum/kinopoisk/main/manifest.json`.
-2. Catalogue → «КиноПоиск» → Install, then restart Jellyfin.
-3. In the library settings enable the «КиноПоиск» metadata and image fetchers and move them to the top.
-
-### Manually (offline)
-
-Download `jellyfin-plugin-kinopoisk_<version>.zip` matching your Jellyfin version (`12.2.X.Y` for Jellyfin 12.2) from
-[Releases](https://github.com/dark-mechanicum/kinopoisk/releases), unpack it into
-`<jellyfin data>/plugins/Kinopoisk_<version>/` and restart Jellyfin.
 
 ## Development
 
@@ -87,11 +116,17 @@ the server process, so shared libraries must match what the server ships. All ve
 
 All provider and client tests call the live Kinopoisk API — nothing is mocked — so CI sees Kinopoisk changes as soon as
 they happen. They use long-lived titles (`tests/.../KnownTitles.cs`) and only check ranges for values that drift, such as
-ratings.
+ratings. The only fake is an HTTP handler in the retry tests: it checks the plugin's own retry logic, not Kinopoisk.
 
 The GraphQL documents in `src/Jellyfin.Plugin.Kinopoisk/Api/Queries` are Kinopoisk's own: the server rejects any
 document it does not know (`the query is not allowed`), so they cannot be edited, only replaced with fresh copies taken
 from the site.
+
+### Known issues and roadmap
+
+[`docs/ISSUES-REPORT.md`](docs/ISSUES-REPORT.md) lists the problems found across all Kinopoisk plugins for Jellyfin, says
+which ones affect this project, and describes how to fix each one (items `KP-01` … `KP-26`). Reference the item id in
+commits that fix it.
 
 ## CI
 
@@ -99,6 +134,10 @@ from the site.
   version is aligned with Jellyfin (see [Versioning](#versioning)), formatting, does a warnings-as-errors build, the live
   tests and packaging. If the daily run fails it opens (or comments on) an `api-drift` issue, and closes it again once a
   later daily run passes.
+- The daily (and manual) run also has a **`streaming-catalog`** job. The Kinopoisk streaming catalog (season lists) is
+  invisible from GitHub's runners, so those tests normally skip; this job runs only them (`Category=StreamingCatalog`)
+  through the HTTPS proxy in the repository secret **`KINOPOISK_PROXY`** (a proxy in Russia, `http://user:pass@host:port`)
+  and fails instead of skipping. Without the secret the job fails with a clear message.
 - **`release.yml`** runs on a `v12.2.X.Y` tag. It rejects tags that do not match the supported Jellyfin version, then
   builds, tests, creates the GitHub release «v12.2.X.Y for Jellyfin 12.2» with the plugin zip and adds the version with
   its checksum to `manifest.json` on `main`.
@@ -108,7 +147,7 @@ from the site.
 Releases are aligned with the Jellyfin version they support:
 
 | Plugin version | Jellyfin                              | .NET |
-|----------------|---------------------------------------|------|
+| -------------- | ------------------------------------- | ---- |
 | `12.2.X.Y`     | 12.2 — the latest Jellyfin 12 release | 10   |
 
 1. **The first two numbers are the Jellyfin version** the release is built and tested against: `12.2.X.Y` supports
@@ -131,11 +170,11 @@ git tag v12.2.0.0 && git push origin v12.2.0.0     # next feature: v12.2.1.0, ne
 
 - **Patch release** (e.g. 12.2.1): Dependabot bumps `Jellyfin.*`; nothing else changes and the plugin stays on `12.2.X.Y`.
 - **Minor release** (e.g. 12.3): Dependabot's pull request fails the version check on purpose. In that pull request:
-  1. update every version in `Directory.Packages.props` to match Jellyfin 12.3's own
-     [`Directory.Packages.props`](https://github.com/jellyfin/jellyfin/blob/master/Directory.Packages.props);
-  2. set `targetAbi: "12.3.0.0"` in `build.yaml` and `<Version>12.3.0.0</Version>` in `Directory.Build.props`;
-  3. update the version table above and the Jellyfin version mentioned in this README;
-  4. after merging, release `v12.3.0.0`.
+    1. update every version in `Directory.Packages.props` to match Jellyfin 12.3's own
+       [`Directory.Packages.props`](https://github.com/jellyfin/jellyfin/blob/master/Directory.Packages.props);
+    2. set `targetAbi: "12.3.0.0"` in `build.yaml` and `<Version>12.3.0.0</Version>` in `Directory.Build.props`;
+    3. update the version table above and the Jellyfin version mentioned in this README;
+    4. after merging, release `v12.3.0.0`.
 
 ## License
 

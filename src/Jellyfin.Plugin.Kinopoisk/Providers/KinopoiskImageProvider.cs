@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Jellyfin.Plugin.Kinopoisk.Api;
 using Jellyfin.Plugin.Kinopoisk.Common;
 using Jellyfin.Plugin.Kinopoisk.Extensions;
-using MediaBrowser.Common.Net;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
@@ -22,18 +21,18 @@ namespace Jellyfin.Plugin.Kinopoisk.Providers;
 public abstract class KinopoiskImageProvider<TItem> : IRemoteImageProvider
     where TItem : BaseItem
 {
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ImageDownloader _imageDownloader;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="KinopoiskImageProvider{TItem}"/> class.
     /// </summary>
     /// <param name="client">The Kinopoisk client.</param>
-    /// <param name="httpClientFactory">The HTTP client factory.</param>
+    /// <param name="imageDownloader">The image downloader.</param>
     /// <param name="logger">The logger.</param>
-    protected KinopoiskImageProvider(IKinopoiskClient client, IHttpClientFactory httpClientFactory, ILogger logger)
+    protected KinopoiskImageProvider(IKinopoiskClient client, ImageDownloader imageDownloader, ILogger logger)
     {
         Client = client;
-        _httpClientFactory = httpClientFactory;
+        _imageDownloader = imageDownloader;
         Logger = logger;
     }
 
@@ -67,14 +66,14 @@ public abstract class KinopoiskImageProvider<TItem> : IRemoteImageProvider
         }
         catch (KinopoiskApiException ex)
         {
-            Logger.LogError(ex, "Kinopoisk image lookup failed for {Name} ({Id})", item.Name, kinopoiskId);
+            LookupFailure.Log(Logger, ex, $"{item.Name} ({kinopoiskId})");
             return [];
         }
     }
 
     /// <inheritdoc />
     public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
-        => _httpClientFactory.CreateClient(NamedClient.Default).GetAsync(url, cancellationToken);
+        => _imageDownloader.GetAsync(url, cancellationToken);
 
     /// <summary>
     /// Converts raw pairs into distinct Jellyfin images, keeping order.

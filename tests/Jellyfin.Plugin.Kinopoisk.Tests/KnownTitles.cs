@@ -41,4 +41,10 @@ public static class KnownTitles
 
     /// <summary>An id no film, series or person has.</summary>
     public const int UnknownId = 999_999_999;
+
+    /// <summary>Bill Pope, cinematographer of «Матрица».</summary>
+    public const int BillPopeId = 278101;
+
+    /// <summary>Холли Барио: Kinopoisk has no photo and returns a placeholder SVG.</summary>
+    public const int PhotolessPersonId = 544474;
 }

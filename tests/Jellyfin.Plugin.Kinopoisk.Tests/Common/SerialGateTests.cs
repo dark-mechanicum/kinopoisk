@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -62,6 +63,29 @@ public sealed class SerialGateTests : IDisposable
 
         release.SetResult(0);
         await blocker;
+    }
+
+    [Fact]
+    public async Task RunAsync_WaitsMinimumIntervalBetweenJobs()
+    {
+        using var gate = new SerialGate(() => TimeSpan.FromMilliseconds(100));
+        await gate.RunAsync(() => Task.FromResult(0), _token);
+        var watch = Stopwatch.StartNew();
+
+        await gate.RunAsync(() => Task.FromResult(0), _token);
+
+        Assert.True(watch.ElapsedMilliseconds >= 90, $"Second job started after {watch.ElapsedMilliseconds} ms.");
+    }
+
+    [Fact]
+    public async Task RunAsync_FirstJobDoesNotWaitForInterval()
+    {
+        using var gate = new SerialGate(() => TimeSpan.FromSeconds(10));
+        var watch = Stopwatch.StartNew();
+
+        await gate.RunAsync(() => Task.FromResult(0), _token);
+
+        Assert.True(watch.ElapsedMilliseconds < 5000);
     }
 
     public void Dispose() => _gate.Dispose();

@@ -54,22 +54,24 @@ public sealed class SeriesAndPersonApiLiveTests : IDisposable
     }
 
     [Fact]
+    [Trait("Category", StreamingCatalog.Category)]
     public async Task FilmPage_ReturnsSeasonsWithContentIds()
     {
         var page = await Client.GetFilmPageAsync(KnownTitles.MetodContentId, _token);
 
         Assert.Equal(KnownTitles.MetodId, page.Id);
-        Assert.SkipUnless(page.Seasons?.Items is { Count: > 0 }, StreamingCatalog.UnavailableReason);
-        var first = Assert.Single(page.Seasons.Items, s => s.Number == 1);
+        StreamingCatalog.RequireAvailable(page.Seasons?.Items is { Count: > 0 });
+        var first = Assert.Single(page.Seasons!.Items!, s => s.Number == 1);
         Assert.Equal(KnownTitles.MetodSeason1ContentId, first.ContentId);
     }
 
     [Fact]
+    [Trait("Category", StreamingCatalog.Category)]
     public async Task SerialStructureSeason_ReturnsWholeSeason()
     {
         var episodes = await Client.GetSeasonEpisodesAsync(KnownTitles.MetodSeason1ContentId, _token);
 
-        Assert.SkipWhen(episodes.Count == 0, StreamingCatalog.UnavailableReason);
+        StreamingCatalog.RequireAvailable(episodes.Count > 0);
         Assert.Equal(Enumerable.Range(1, 16), episodes.Select(e => e.Number));
         Assert.All(episodes, e => Assert.Equal(1, e.Season?.Number));
         Assert.All(episodes, e => Assert.False(string.IsNullOrWhiteSpace(e.Synopsis)));
@@ -99,8 +101,29 @@ public sealed class SeriesAndPersonApiLiveTests : IDisposable
     }
 
     [Fact]
-    public async Task PersonApi_UnknownIdThrows()
-        => await Assert.ThrowsAsync<KinopoiskApiException>(() => Client.GetPersonAsync(KnownTitles.UnknownId, _token));
+    public async Task PersonApi_UnknownIdThrowsNotFound()
+    {
+        var ex = await Assert.ThrowsAsync<KinopoiskApiException>(() => Client.GetPersonAsync(KnownTitles.UnknownId, _token));
+
+        Assert.Equal(KinopoiskErrorKind.NotFound, ex.Kind);
+    }
+
+    [Fact]
+    public async Task PersonApi_PhotolessPersonHasNoArtwork()
+    {
+        var person = await Client.GetPersonAsync(KnownTitles.PhotolessPersonId, _token);
+
+        Assert.False(string.IsNullOrWhiteSpace(person.Name));
+        Assert.DoesNotContain(person.GetArtwork(), i => i.Url is not null);
+    }
+
+    [Fact]
+    public async Task TvSeriesBaseInfo_ReturnsNetworkAsDistributor()
+    {
+        var series = await Client.GetSeriesAsync(KnownTitles.GameOfThronesId, _token);
+
+        Assert.Contains("HBO", series.Distribution?.CompanyNames ?? []);
+    }
 
     public void Dispose() => _services.Dispose();
 }

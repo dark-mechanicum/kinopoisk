@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Kinopoisk.Common;
+using Jellyfin.Plugin.Kinopoisk.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.Kinopoisk.Api;
@@ -25,22 +27,27 @@ public sealed class KinopoiskTransport : IDisposable
     private const string GraphQlUrl = "https://graphql.kinopoisk.ru/graphql";
     private const string RestUrl = Constants.SiteUrl + "/api/";
     private const string QueryResourcePrefix = "Jellyfin.Plugin.Kinopoisk.Api.Queries.";
+    private const int MaxAttempts = 3;
 
     private static readonly ConcurrentDictionary<string, string> _queries = new(StringComparer.Ordinal);
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<KinopoiskTransport> _logger;
-    private readonly SerialGate _gate = new();
+    private readonly SerialGate _gate;
+    private readonly HttpRetry _retry;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="KinopoiskTransport"/> class.
     /// </summary>
     /// <param name="httpClientFactory">The HTTP client factory.</param>
+    /// <param name="options">The plugin options.</param>
     /// <param name="logger">The logger.</param>
-    public KinopoiskTransport(IHttpClientFactory httpClientFactory, ILogger<KinopoiskTransport> logger)
+    public KinopoiskTransport(IHttpClientFactory httpClientFactory, IKinopoiskOptions options, ILogger<KinopoiskTransport> logger)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        _gate = new SerialGate(() => TimeSpan.FromMilliseconds(options.MinRequestIntervalMs));
+        _retry = new HttpRetry(MaxAttempts, logger);
     }
 
     /// <summary>
@@ -104,21 +111,47 @@ public sealed class KinopoiskTransport : IDisposable
             return reader.ReadToEnd();
         });
 
+    /// <summary>
+    /// Classifies a non-success HTTP status.
+    /// </summary>
+    /// <param name="status">The status.</param>
+    /// <returns>NotFound for 404, Transient for 429 and 5xx, Contract otherwise.</returns>
+    internal static KinopoiskErrorKind ToErrorKind(HttpStatusCode status)
+        => status == HttpStatusCode.NotFound ? KinopoiskErrorKind.NotFound
+            : HttpRetry.IsTransient(status) ? KinopoiskErrorKind.Transient
+            : KinopoiskErrorKind.Contract;
+
     private Task<string> SendAsync(string clientName, Func<HttpRequestMessage> createRequest, CancellationToken cancellationToken)
         => _gate.RunAsync(
             async () =>
             {
-                using var request = createRequest();
-                using var response = await _httpClientFactory.CreateClient(clientName)
-                    .SendAsync(request, cancellationToken).ConfigureAwait(false);
+                using var response = await SendWithRetryAsync(clientName, createRequest, cancellationToken).ConfigureAwait(false);
                 var content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode)
                 {
                     throw new KinopoiskApiException(
-                        $"Kinopoisk {request.RequestUri} answered {(int)response.StatusCode} {response.ReasonPhrase}: {KinopoiskJson.Snippet(content)}");
+                        $"Kinopoisk {response.RequestMessage?.RequestUri} answered {(int)response.StatusCode} {response.ReasonPhrase}: {KinopoiskJson.Snippet(content)}",
+                        ToErrorKind(response.StatusCode));
                 }
 
                 return content;
             },
             cancellationToken);
+
+    private async Task<HttpResponseMessage> SendWithRetryAsync(
+        string clientName, Func<HttpRequestMessage> createRequest, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _retry.SendAsync(_httpClientFactory.CreateClient(clientName), createRequest, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new KinopoiskApiException($"Kinopoisk is unreachable: {ex.Message}", KinopoiskErrorKind.Transient, ex);
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new KinopoiskApiException("Kinopoisk did not answer in time.", KinopoiskErrorKind.Transient, ex);
+        }
+    }
 }

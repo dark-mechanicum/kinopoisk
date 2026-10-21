@@ -61,5 +61,29 @@ public sealed class PersonProvidersLiveTests : IDisposable
         response.EnsureSuccessStatusCode();
     }
 
+    [Fact]
+    public async Task GetImages_PhotolessPerson_ReturnsNoPlaceholder()
+    {
+        var provider = _services.Create<PersonImageProvider>();
+        var person = new Person();
+        person.SetKinopoiskId(KnownTitles.PhotolessPersonId);
+
+        var images = await provider.GetImages(person, _token);
+
+        Assert.DoesNotContain(images, i => i.Url.EndsWith(".svg", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task GetMetadata_UnknownId_ReturnsEmptyResult()
+    {
+        IRemoteMetadataProvider<Person, PersonLookupInfo> provider = _services.Create<PersonMetadataProvider>();
+        var info = new PersonLookupInfo();
+        info.SetKinopoiskId(KnownTitles.UnknownId);
+
+        var result = await provider.GetMetadata(info, _token);
+
+        Assert.False(result.HasMetadata);
+    }
+
     public void Dispose() => _services.Dispose();
 }

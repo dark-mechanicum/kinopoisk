@@ -4,6 +4,7 @@ using System.Linq;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.Kinopoisk.Api.Models;
 using Jellyfin.Plugin.Kinopoisk.Common;
+using Jellyfin.Plugin.Kinopoisk.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
 
@@ -14,6 +15,20 @@ namespace Jellyfin.Plugin.Kinopoisk.Extensions;
 /// </summary>
 public static class MetadataResultExtensions
 {
+    // Jellyfin 12.2 has no cinematographer kind; such people show up under "Crew" with the role as caption.
+    private static readonly (Func<FilmInfo, FilmCrewMembers?> Members, PersonKind Kind, string? Role)[] _credits =
+    [
+        (f => f.Directors, PersonKind.Director, null),
+        (f => f.Actors, PersonKind.Actor, null),
+        (f => f.Writers, PersonKind.Writer, null),
+        (f => f.Producers, PersonKind.Producer, null),
+        (f => f.Composers, PersonKind.Composer, null),
+        (f => f.FilmEditors, PersonKind.Editor, null),
+        (f => f.Operators, PersonKind.Unknown, "Оператор"),
+        (f => f.Designers, PersonKind.Artist, "Художник"),
+        (f => f.VoiceOverActors, PersonKind.Actor, "Озвучка"),
+    ];
+
     /// <summary>
     /// Creates an empty result tagged with this provider.
     /// </summary>
@@ -34,7 +49,8 @@ public static class MetadataResultExtensions
     /// <typeparam name="T">The item type.</typeparam>
     /// <param name="result">The result.</param>
     /// <param name="film">The film.</param>
-    public static void FillFrom<T>(this MetadataResult<T> result, FilmInfo film)
+    /// <param name="options">The plugin options.</param>
+    public static void FillFrom<T>(this MetadataResult<T> result, FilmInfo film, IKinopoiskOptions options)
         where T : BaseItem
     {
         var item = result.Item;
@@ -45,7 +61,7 @@ public static class MetadataResultExtensions
         item.OriginalTitle = film.Title?.Original;
         item.ProductionYear = film.Year;
         item.PremiereDate = ParseDate(film.WorldPremiere?.IncompleteDate);
-        item.CommunityRating = film.Rating?.Community;
+        item.CommunityRating = film.Rating?.GetCommunity(options.CommunityRating);
         item.CriticRating = film.Rating?.Critics;
         item.OfficialRating = film.Restriction?.OfficialRating;
         item.Tagline = film.Tagline;
@@ -55,18 +71,22 @@ public static class MetadataResultExtensions
         {
             if (!string.IsNullOrWhiteSpace(genre.Name))
             {
-                item.AddGenre(genre.Name);
+                item.AddGenre(options.CapitalizeGenres ? genre.Name.ToGenreName() : genre.Name);
             }
         }
 
         item.ProductionLocations = [.. film.Countries.Select(c => c.Name).OfType<string>().Where(n => n.Length > 0)];
 
-        result.AddPeople(PersonKind.Director, film.Directors);
-        result.AddPeople(PersonKind.Actor, film.Actors);
-        result.AddPeople(PersonKind.Writer, film.Writers);
-        result.AddPeople(PersonKind.Producer, film.Producers);
-        result.AddPeople(PersonKind.Composer, film.Composers);
-        result.AddPeople(PersonKind.Editor, film.FilmEditors);
+        foreach (var company in film.Distribution?.CompanyNames ?? [])
+        {
+            item.AddStudio(company);
+        }
+
+        foreach (var (members, kind, role) in _credits)
+        {
+            result.AddPeople(members(film), kind, role);
+        }
+
         result.HasMetadata = true;
     }
 
@@ -113,7 +133,7 @@ public static class MetadataResultExtensions
         result.HasMetadata = true;
     }
 
-    private static void AddPeople<T>(this MetadataResult<T> result, PersonKind kind, FilmCrewMembers? members)
+    private static void AddPeople<T>(this MetadataResult<T> result, FilmCrewMembers? members, PersonKind kind, string? role)
         where T : BaseItem
     {
         foreach (var member in members?.Items ?? [])
@@ -124,7 +144,7 @@ public static class MetadataResultExtensions
                 continue;
             }
 
-            var info = new PersonInfo { Name = person.Name, Type = kind };
+            var info = new PersonInfo { Name = person.Name, Type = kind, Role = role };
             info.SetKinopoiskId(person.Id);
             result.AddPerson(info);
         }

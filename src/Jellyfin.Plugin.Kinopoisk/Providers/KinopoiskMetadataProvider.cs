@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Jellyfin.Plugin.Kinopoisk.Api;
 using Jellyfin.Plugin.Kinopoisk.Common;
 using Jellyfin.Plugin.Kinopoisk.Extensions;
-using MediaBrowser.Common.Net;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Providers;
@@ -23,18 +22,18 @@ public abstract class KinopoiskMetadataProvider<TItem, TLookup> : IRemoteMetadat
     where TItem : BaseItem, IHasLookupInfo<TLookup>, new()
     where TLookup : ItemLookupInfo, new()
 {
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ImageDownloader _imageDownloader;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="KinopoiskMetadataProvider{TItem, TLookup}"/> class.
     /// </summary>
     /// <param name="client">The Kinopoisk client.</param>
-    /// <param name="httpClientFactory">The HTTP client factory.</param>
+    /// <param name="imageDownloader">The image downloader.</param>
     /// <param name="logger">The logger.</param>
-    protected KinopoiskMetadataProvider(IKinopoiskClient client, IHttpClientFactory httpClientFactory, ILogger logger)
+    protected KinopoiskMetadataProvider(IKinopoiskClient client, ImageDownloader imageDownloader, ILogger logger)
     {
         Client = client;
-        _httpClientFactory = httpClientFactory;
+        _imageDownloader = imageDownloader;
         Logger = logger;
     }
 
@@ -62,7 +61,7 @@ public abstract class KinopoiskMetadataProvider<TItem, TLookup> : IRemoteMetadat
         }
         catch (KinopoiskApiException ex)
         {
-            Logger.LogError(ex, "Kinopoisk metadata lookup failed for {Name}", info.Name);
+            LookupFailure.Log(Logger, ex, info.Name);
         }
 
         return result;
@@ -86,7 +85,7 @@ public abstract class KinopoiskMetadataProvider<TItem, TLookup> : IRemoteMetadat
 
     /// <inheritdoc />
     public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
-        => _httpClientFactory.CreateClient(NamedClient.Default).GetAsync(url, cancellationToken);
+        => _imageDownloader.GetAsync(url, cancellationToken);
 
     /// <summary>
     /// Searches by title.

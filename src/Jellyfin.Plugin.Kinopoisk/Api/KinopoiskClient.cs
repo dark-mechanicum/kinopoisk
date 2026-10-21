@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Kinopoisk.Api.Models;
+using Jellyfin.Plugin.Kinopoisk.Common;
+using Jellyfin.Plugin.Kinopoisk.Configuration;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace Jellyfin.Plugin.Kinopoisk.Api;
@@ -13,9 +15,6 @@ namespace Jellyfin.Plugin.Kinopoisk.Api;
 /// </summary>
 public sealed class KinopoiskClient : IKinopoiskClient
 {
-    /// <summary>Number of crew members of each kind to fetch.</summary>
-    public const int CrewLimit = 30;
-
     private const int SuggestLimit = 10;
     private const int ImagesPageSize = 50;
     private const int LatestEpisodesLimit = 30;
@@ -26,17 +25,22 @@ public sealed class KinopoiskClient : IKinopoiskClient
 
     private readonly KinopoiskTransport _transport;
     private readonly IMemoryCache _cache;
+    private readonly IKinopoiskOptions _options;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="KinopoiskClient"/> class.
     /// </summary>
     /// <param name="transport">The transport.</param>
     /// <param name="cache">The cache.</param>
-    public KinopoiskClient(KinopoiskTransport transport, IMemoryCache cache)
+    /// <param name="options">The plugin options.</param>
+    public KinopoiskClient(KinopoiskTransport transport, IMemoryCache cache, IKinopoiskOptions options)
     {
         _transport = transport;
         _cache = cache;
+        _options = options;
     }
+
+    private int VoiceOverActorsLimit => _options.IncludeVoiceActors ? _options.CrewLimit : 0;
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<FilmInfo>> SearchFilmsAsync(string title, int? year, CancellationToken cancellationToken)
@@ -77,8 +81,8 @@ public sealed class KinopoiskClient : IKinopoiskClient
             {
                 filmId,
                 isAuthorized = false,
-                actorsLimit = CrewLimit,
-                voiceOverActorsLimit = 0,
+                actorsLimit = _options.CrewLimit,
+                voiceOverActorsLimit = VoiceOverActorsLimit,
                 relatedMoviesLimit = 0,
                 checkSilentInvoiceAvailability = false,
                 withPurchaseOptions = false,
@@ -96,8 +100,8 @@ public sealed class KinopoiskClient : IKinopoiskClient
             {
                 tvSeriesId = seriesId,
                 isAuthorized = false,
-                actorsLimit = CrewLimit,
-                voiceOverActorsLimit = 0,
+                actorsLimit = _options.CrewLimit,
+                voiceOverActorsLimit = VoiceOverActorsLimit,
                 relatedMoviesLimit = 0,
                 checkSilentInvoiceAvailability = false,
                 withPurchaseOptions = false,
@@ -184,7 +188,7 @@ public sealed class KinopoiskClient : IKinopoiskClient
         {
             return await GetFilmAsync(id, cancellationToken).ConfigureAwait(false);
         }
-        catch (KinopoiskApiException)
+        catch (KinopoiskApiException ex) when (ex.Kind == KinopoiskErrorKind.NotFound)
         {
             // Kinopoisk files some titles that libraries keep as movies (e.g. multi-part cartoons) as series.
             return await GetSeriesAsync(id, cancellationToken).ConfigureAwait(false);
@@ -204,12 +208,29 @@ public sealed class KinopoiskClient : IKinopoiskClient
         return [.. results.Where(f => f.Id > 0)];
     }
 
-    private Task<SuggestTop> SuggestAsync(string keyword, CancellationToken cancellationToken)
-        => CachedAsync($"suggest:{keyword}", () => _transport.QueryAsync<SuggestTop>(
+    private async Task<SuggestTop> SuggestAsync(string keyword, CancellationToken cancellationToken)
+    {
+        var key = $"suggest:{keyword}";
+        if (_cache.TryGetValue(key, out SuggestTop? cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        var suggest = await _transport.QueryAsync<SuggestResult>(
             "SuggestSearch",
-            new { keyword, limit = SuggestLimit },
-            "data.suggest.top",
-            cancellationToken));
+            new { keyword, yandexCityId = Constants.YandexCityId, limit = SuggestLimit },
+            "data.suggest",
+            cancellationToken).ConfigureAwait(false);
+
+        // A null top is Kinopoisk failing to answer, not a real "nothing found", so it is not cached.
+        if (suggest.Top is null)
+        {
+            return new SuggestTop();
+        }
+
+        _cache.Set(key, suggest.Top, _cacheDuration);
+        return suggest.Top;
+    }
 
     private async Task<T> CachedAsync<T>(string key, Func<Task<T>> fetch)
     {

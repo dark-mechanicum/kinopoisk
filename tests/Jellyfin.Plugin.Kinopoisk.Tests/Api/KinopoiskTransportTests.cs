@@ -1,7 +1,9 @@
 using System;
 using System.IO;
+using System.Net;
 using System.Text.Json;
 using Jellyfin.Plugin.Kinopoisk.Api;
+using Jellyfin.Plugin.Kinopoisk.Api.Models;
 using Xunit;
 
 namespace Jellyfin.Plugin.Kinopoisk.Tests.Api;
@@ -43,7 +45,50 @@ public sealed class KinopoiskTransportTests
 
         Assert.Contains("missing 'film'", ex.Message, StringComparison.Ordinal);
         Assert.Contains("There is no film with id 1", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(KinopoiskErrorKind.Contract, ex.Kind);
     }
+
+    [Fact]
+    public void Walk_NotFoundErrorOnRequestedField_HasNotFoundKind()
+    {
+        var root = JsonDocument.Parse(
+            """{"errors":[{"message":"There is no film with id 1","path":["film"],"extensions":{"code":"NotFoundError"}}],"data":{"film":null}}""").RootElement;
+
+        var ex = Assert.Throws<KinopoiskApiException>(() => KinopoiskJson.Walk(root, "data.film"));
+
+        Assert.Equal(KinopoiskErrorKind.NotFound, ex.Kind);
+    }
+
+    [Fact]
+    public void Walk_NotFoundErrorOnOtherField_HasContractKind()
+    {
+        // Every FilmBaseInfo answer carries a NotFoundError for tvSeries; it says nothing about the film.
+        var root = JsonDocument.Parse(
+            """{"errors":[{"message":"There is no TV series with id 1","path":["tvSeries"],"extensions":{"code":"NotFoundError"}}],"data":{"film":{"id":1}}}""").RootElement;
+
+        var ex = Assert.Throws<KinopoiskApiException>(() => KinopoiskJson.Walk(root, "data.film.title"));
+
+        Assert.Equal(KinopoiskErrorKind.Contract, ex.Kind);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound, KinopoiskErrorKind.NotFound)]
+    [InlineData(HttpStatusCode.TooManyRequests, KinopoiskErrorKind.Transient)]
+    [InlineData(HttpStatusCode.InternalServerError, KinopoiskErrorKind.Transient)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, KinopoiskErrorKind.Transient)]
+    [InlineData(HttpStatusCode.BadRequest, KinopoiskErrorKind.Contract)]
+    [InlineData(HttpStatusCode.Forbidden, KinopoiskErrorKind.Contract)]
+    public void ToErrorKind_MapsHttpStatus(HttpStatusCode status, KinopoiskErrorKind expected)
+        => Assert.Equal(expected, KinopoiskTransport.ToErrorKind(status));
+
+    [Theory]
+    [InlineData("POSTER", FilmImageType.Poster)]
+    [InlineData("FAN_ART", FilmImageType.FanArt)]
+    [InlineData("PROMO", null)]
+    [InlineData("poster", null)]
+    [InlineData(null, null)]
+    public void ParseImageType_MapsKnownLiteralsAndRejectsOthers(string? literal, FilmImageType? expected)
+        => Assert.Equal(expected, KinopoiskJson.ParseImageType(literal));
 
     [Fact]
     public void Walk_ToleratesPartialErrorsWhenDataPresent()
@@ -60,8 +105,8 @@ public sealed class KinopoiskTransportTests
         => Assert.Throws<KinopoiskApiException>(() => KinopoiskJson.Parse(body));
 
     [Theory]
-    [InlineData(Kinopoisk.Api.Models.FilmImageType.FanArt, "FAN_ART")]
-    [InlineData(Kinopoisk.Api.Models.FilmImageType.Poster, "POSTER")]
-    public void ToLiteral_UsesGraphQlEnumNames(Kinopoisk.Api.Models.FilmImageType type, string expected)
+    [InlineData(FilmImageType.FanArt, "FAN_ART")]
+    [InlineData(FilmImageType.Poster, "POSTER")]
+    public void ToLiteral_UsesGraphQlEnumNames(FilmImageType type, string expected)
         => Assert.Equal(expected, KinopoiskJson.ToLiteral(type));
 }

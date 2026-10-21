@@ -7,7 +7,6 @@ using Jellyfin.Plugin.Kinopoisk.Api;
 using Jellyfin.Plugin.Kinopoisk.Api.Models;
 using Jellyfin.Plugin.Kinopoisk.Common;
 using Jellyfin.Plugin.Kinopoisk.Extensions;
-using MediaBrowser.Common.Net;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Providers;
@@ -21,19 +20,19 @@ namespace Jellyfin.Plugin.Kinopoisk.Providers;
 public sealed class EpisodeMetadataProvider : IRemoteMetadataProvider<Episode, EpisodeInfo>
 {
     private readonly IKinopoiskClient _client;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ImageDownloader _imageDownloader;
     private readonly ILogger<EpisodeMetadataProvider> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EpisodeMetadataProvider"/> class.
     /// </summary>
     /// <param name="client">The Kinopoisk client.</param>
-    /// <param name="httpClientFactory">The HTTP client factory.</param>
+    /// <param name="imageDownloader">The image downloader.</param>
     /// <param name="logger">The logger.</param>
-    public EpisodeMetadataProvider(IKinopoiskClient client, IHttpClientFactory httpClientFactory, ILogger<EpisodeMetadataProvider> logger)
+    public EpisodeMetadataProvider(IKinopoiskClient client, ImageDownloader imageDownloader, ILogger<EpisodeMetadataProvider> logger)
     {
         _client = client;
-        _httpClientFactory = httpClientFactory;
+        _imageDownloader = imageDownloader;
         _logger = logger;
     }
 
@@ -54,7 +53,7 @@ public sealed class EpisodeMetadataProvider : IRemoteMetadataProvider<Episode, E
         }
         catch (KinopoiskApiException ex)
         {
-            _logger.LogError(ex, "Kinopoisk episode lookup failed for S{Season}E{Episode}", info.ParentIndexNumber, info.IndexNumber);
+            LookupFailure.Log(_logger, ex, $"S{info.ParentIndexNumber}E{info.IndexNumber}");
         }
 
         return result;
@@ -69,7 +68,7 @@ public sealed class EpisodeMetadataProvider : IRemoteMetadataProvider<Episode, E
 
     /// <inheritdoc />
     public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
-        => _httpClientFactory.CreateClient(NamedClient.Default).GetAsync(url, cancellationToken);
+        => _imageDownloader.GetAsync(url, cancellationToken);
 
     /// <summary>
     /// Finds the episode: first in its season (series on the streaming service), then among the latest releases.
