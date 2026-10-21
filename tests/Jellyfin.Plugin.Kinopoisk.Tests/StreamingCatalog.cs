@@ -7,12 +7,12 @@ using Xunit;
 namespace Jellyfin.Plugin.Kinopoisk.Tests;
 
 /// <summary>
-/// The Kinopoisk streaming catalog (season lists, season episodes) is region-restricted: from some networks,
-/// e.g. GitHub's Azure runners, every title is <c>UNWATCHABLE</c> and season data comes back empty.
+/// The Kinopoisk streaming catalog (season lists, season episodes) is hidden from datacenter networks: from GitHub's
+/// hosted runners or a VPS every title is <c>UNWATCHABLE</c> and season data comes back empty.
 /// Tests that need it carry <c>[Trait("Category", StreamingCatalog.Category)]</c> and call <see cref="RequireAvailable"/>
 /// or <see cref="SkipUnlessAvailableAsync"/>; the queries still run first, so a schema change fails the test
-/// instead of skipping it. With <c>KINOPOISK_REQUIRE_STREAMING_CATALOG=1</c> (the CI job behind a Russian proxy)
-/// an unavailable catalog fails instead of skipping.
+/// instead of skipping it. With <c>KINOPOISK_REQUIRE_STREAMING_CATALOG=1</c> (the CI job on the self-hosted runner with
+/// a residential connection) an unavailable catalog fails instead of skipping.
 /// </summary>
 public static class StreamingCatalog
 {
