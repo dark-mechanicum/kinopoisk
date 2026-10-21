@@ -122,12 +122,6 @@ The GraphQL documents in `src/Jellyfin.Plugin.Kinopoisk/Api/Queries` are Kinopoi
 document it does not know (`the query is not allowed`), so they cannot be edited, only replaced with fresh copies taken
 from the site.
 
-### Known issues and roadmap
-
-[`docs/ISSUES-REPORT.md`](docs/ISSUES-REPORT.md) lists the problems found across all Kinopoisk plugins for Jellyfin, says
-which ones affect this project, and describes how to fix each one (items `KP-01` … `KP-26`). Reference the item id in
-commits that fix it.
-
 ## CI
 
 - **`ci.yml`** runs on every push to `main`, on pull requests, **every day at 04:00 UTC** and on demand. It checks that the
