@@ -9,6 +9,14 @@
     "imageUrl": "https://avatars.mds.yandex.net/get-vthumb/880526/8e310a4ac77a414a5fc3c20eba8bb6a1/800x450",
     "versions": [
       {
+        "version": "12.2.2.0",
+        "changelog": "For Jellyfin 12.2. See the v12.2.2.0 release notes.",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/dark-mechanicum/kinopoisk/releases/download/v12.2.2.0/jellyfin-plugin-kinopoisk_12.2.2.0.zip",
+        "checksum": "9567fc07189321b09c6e50c9fc5f0ba4",
+        "timestamp": "2026-10-21T18:58:40Z"
+      },
+      {
         "version": "12.2.1.1",
         "changelog": "For Jellyfin 12.2. See the v12.2.1.1 release notes.",
         "targetAbi": "12.2.0.0",
