@@ -128,10 +128,11 @@ from the site.
   version is aligned with Jellyfin (see [Versioning](#versioning)), formatting, does a warnings-as-errors build, the live
   tests and packaging. If the daily run fails it opens (or comments on) an `api-drift` issue, and closes it again once a
   later daily run passes.
-- The daily (and manual) run also has a **`streaming-catalog`** job. The Kinopoisk streaming catalog (season lists) is
-  invisible from GitHub's runners, so those tests normally skip; this job runs only them (`Category=StreamingCatalog`)
-  through the HTTPS proxy in the repository secret **`KINOPOISK_PROXY`** (a proxy in Russia, `http://user:pass@host:port`)
-  and fails instead of skipping. Without the secret the job fails with a clear message.
+- The daily (and manual) run also has a **`streaming-catalog`** job. Kinopoisk hides its streaming catalog (season
+  lists) from datacenter networks, so on GitHub's runners those tests skip. This job runs only them
+  (`Category=StreamingCatalog`) on a **self-hosted runner** with the label `kinopoisk-home` on a residential connection,
+  and fails instead of skipping. If that runner is offline, the job waits in the queue and the daily drift report
+  fails after the 24-hour queue timeout. It never runs for pull requests.
 - **`release.yml`** runs on a `v12.2.X.Y` tag. It rejects tags that do not match the supported Jellyfin version, then
   builds, tests, creates the GitHub release «v12.2.X.Y for Jellyfin 12.2» with the plugin zip and adds the version with
   its checksum to `manifest.json` on `main`.

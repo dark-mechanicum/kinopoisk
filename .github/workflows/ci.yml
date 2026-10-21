@@ -69,22 +69,18 @@ jobs:
           path: artifacts/*.zip
 
   streaming-catalog:
-    # KP-25: the season-based episode lookup needs the region-restricted streaming catalog, which GitHub's runners
-    # cannot see. This job runs only those tests through a proxy in Russia and fails instead of skipping.
+    # KP-25: the season-based episode lookup needs the Kinopoisk streaming catalog, which Kinopoisk hides from datacenter
+    # networks (GitHub-hosted runners, VPS). This job runs only those tests on a self-hosted runner on a residential
+    # connection (/data/github-runners on the home server) and fails instead of skipping.
+    # Never add pull_request here: the repository is public and the runner must only run this repository's own code.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, kinopoisk-home]
     timeout-minutes: 15
     env:
-      HTTPS_PROXY: ${{ secrets.KINOPOISK_PROXY }}
       KINOPOISK_REQUIRE_STREAMING_CATALOG: "1"
+      # The runner user cannot write the default /usr/share/dotnet; this keeps the SDK between runs.
+      DOTNET_INSTALL_DIR: /home/runner/.dotnet
     steps:
-      - name: Check proxy secret
-        run: |
-          if [ -z "$HTTPS_PROXY" ]; then
-            echo "::error::Repository secret KINOPOISK_PROXY is not set (an HTTPS proxy in Russia, e.g. http://user:pass@host:port)."
-            exit 1
-          fi
-
       - uses: actions/checkout@v7
 
       - uses: actions/setup-dotnet@v6
@@ -92,15 +88,12 @@ jobs:
           global-json-file: global.json
 
       - name: Restore
-        # NuGet goes direct; only the tests use the proxy.
-        env:
-          HTTPS_PROXY: ""
         run: dotnet restore Kinopoisk.slnx
 
       - name: Build
         run: dotnet build Kinopoisk.slnx --configuration Release --no-restore
 
-      - name: Test the streaming catalog through the proxy
+      - name: Test the streaming catalog
         run: >
           dotnet test Kinopoisk.slnx
           --configuration Release
