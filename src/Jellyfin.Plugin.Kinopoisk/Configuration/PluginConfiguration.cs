@@ -46,4 +46,10 @@ public sealed class PluginConfiguration : BasePluginConfiguration, IKinopoiskOpt
 
     /// <inheritdoc />
     public RatingSource CommunityRating { get; set; } = RatingSource.Kinopoisk;
+
+    /// <inheritdoc />
+    public bool TagTop250 { get; set; }
+
+    /// <inheritdoc />
+    public bool IncludePersonBiography { get; set; }
 }

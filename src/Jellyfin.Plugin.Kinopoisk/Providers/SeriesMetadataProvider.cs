@@ -47,7 +47,11 @@ public sealed class SeriesMetadataProvider : KinopoiskMetadataProvider<Series, S
 
     /// <inheritdoc />
     protected override async Task FillAsync(MetadataResult<Series> result, int kinopoiskId, CancellationToken cancellationToken)
-        => result.FillFrom(await Client.GetSeriesAsync(kinopoiskId, cancellationToken).ConfigureAwait(false), _options);
+    {
+        var series = await Client.GetSeriesAsync(kinopoiskId, cancellationToken).ConfigureAwait(false);
+        result.FillFrom(series, _options);
+        result.Item.FillSeriesRun(series);
+    }
 
     /// <inheritdoc />
     protected override IEnumerable<string> GetPathNames(SeriesInfo info)

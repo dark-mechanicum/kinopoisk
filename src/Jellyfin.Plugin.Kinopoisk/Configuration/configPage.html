@@ -42,6 +42,20 @@
                             <span>Добавлять актёров дубляжа (роль «Озвучка»)</span>
                         </label>
                     </div>
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="TagTop250" />
+                            <span>Тег «Топ-250 КиноПоиска» для фильмов и сериалов из топ-250</span>
+                        </label>
+                        <div class="fieldDescription">Тег не снимается сам, если фильм выбыл из списка; его убирает «Заменить все метаданные».</div>
+                    </div>
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="IncludePersonBiography" />
+                            <span>Биография персон из фактов КиноПоиска</span>
+                        </label>
+                        <div class="fieldDescription">Заменяет описание персоны при обновлении метаданных, если КиноПоиск стоит выше других провайдеров.</div>
+                    </div>
                     <div class="inputContainer">
                         <input is="emby-input" type="number" id="MinRequestIntervalMs" min="0" max="5000" required label="Пауза между запросами к КиноПоиску, мс (0–5000)" />
                         <div class="fieldDescription">Увеличьте, если КиноПоиск отвечает «429 Too Many Requests».</div>
@@ -72,7 +86,7 @@
                 var pluginId = '9b3b77c3-61a9-43a0-bfea-0be2c473e8bd';
                 var page = document.querySelector('#kinopoiskConfigPage');
                 var numbers = ['CrewLimit', 'MinRequestIntervalMs'];
-                var flags = ['CapitalizeGenres', 'IncludeVoiceActors', 'PreferIpv4'];
+                var flags = ['CapitalizeGenres', 'IncludeVoiceActors', 'TagTop250', 'IncludePersonBiography', 'PreferIpv4'];
 
                 page.addEventListener('pageshow', function () {
                     Dashboard.showLoadingMsg();

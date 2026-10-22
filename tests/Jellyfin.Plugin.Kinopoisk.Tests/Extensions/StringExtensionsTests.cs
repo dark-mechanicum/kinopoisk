@@ -90,6 +90,16 @@ public sealed class StringExtensionsTests
     public void ToGenreName_CapitalizesFirstLetterOnly(string name, string expected)
         => Assert.Equal(expected, name.ToGenreName());
 
+    [Theory]
+    [InlineData("сестры <a href=\"/name/282183/\" class=\"all\">Ким</a> была", "сестры Ким была")]
+    [InlineData("«<a href=\"/film/1990/\">На гребне волны</a>»", "«На гребне волны»")]
+    [InlineData("Tom &amp; Jerry &laquo;мульт&raquo; &#8212; &nbsp;классика", "Tom & Jerry «мульт» — классика")]
+    [InlineData("  строка\nс\t переносами  ", "строка с переносами")]
+    [InlineData("<br/><i></i>", "")]
+    [InlineData("", "")]
+    public void ToPlainText_StripsTagsDecodesEntitiesAndCollapsesSpaces(string html, string expected)
+        => Assert.Equal(expected, html.ToPlainText());
+
     private static void AssertPosition(string path, string title, int? year, int expectedPosition)
     {
         var candidates = path.ParseFileName().ToList();

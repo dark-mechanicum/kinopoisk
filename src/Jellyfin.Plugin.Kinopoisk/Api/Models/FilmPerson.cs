@@ -30,6 +30,12 @@ public sealed record FilmPerson : BaseMetadata
     /// <summary>Gets the birth place.</summary>
     public string? BirthPlace { get; init; }
 
+    /// <summary>Gets the death date (ISO); null for a living person.</summary>
+    public string? DeathDate { get; init; }
+
+    /// <summary>Gets the biography facts, as HTML fragments with links to other Kinopoisk pages.</summary>
+    public IReadOnlyList<string>? Facts { get; init; }
+
     /// <summary>Gets the main photo set.</summary>
     public PersonImages? Img { get; init; }
 

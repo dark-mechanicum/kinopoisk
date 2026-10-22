@@ -68,6 +68,54 @@ public sealed class MovieProvidersLiveTests : IDisposable
     }
 
     [Fact]
+    public async Task GetMetadata_Top250Film_HasNoTagByDefault()
+    {
+        IRemoteMetadataProvider<Movie, MovieInfo> provider = _services.Create<MovieMetadataProvider>();
+
+        var result = await provider.GetMetadata(MatrixInfo(), _token);
+
+        Assert.True(result.HasMetadata);
+        Assert.DoesNotContain(Constants.Top250Tag, result.Item.Tags);
+    }
+
+    [Fact]
+    public async Task GetMetadata_Top250Film_IsTaggedWhenEnabled()
+    {
+        using var services = new LiveServices(new PluginConfiguration { TagTop250 = true });
+        IRemoteMetadataProvider<Movie, MovieInfo> provider = services.Create<MovieMetadataProvider>();
+
+        var result = await provider.GetMetadata(MatrixInfo(), _token);
+
+        Assert.Equal([Constants.Top250Tag], result.Item.Tags);
+    }
+
+    [Fact]
+    public async Task GetMetadata_FilmOutsideTop250_IsNotTaggedWhenEnabled()
+    {
+        using var services = new LiveServices(new PluginConfiguration { TagTop250 = true });
+        IRemoteMetadataProvider<Movie, MovieInfo> provider = services.Create<MovieMetadataProvider>();
+        var info = new MovieInfo();
+        info.SetKinopoiskId(KnownTitles.NeznaykaUchitsyaId);
+
+        var result = await provider.GetMetadata(info, _token);
+
+        Assert.True(result.HasMetadata);
+        Assert.Empty(result.Item.Tags);
+    }
+
+    [Fact]
+    public async Task GetMetadata_Movie_LeavesRuntimeToTheMediaFile()
+    {
+        // Jellyfin ignores a provider runtime on videos, so the plugin does not send one.
+        IRemoteMetadataProvider<Movie, MovieInfo> provider = _services.Create<MovieMetadataProvider>();
+
+        var result = await provider.GetMetadata(MatrixInfo(), _token);
+
+        Assert.Null(result.Item.RunTimeTicks);
+        Assert.Null(result.Item.EndDate);
+    }
+
+    [Fact]
     public async Task GetMetadata_WithoutId_FindsMovieByFileName()
     {
         IRemoteMetadataProvider<Movie, MovieInfo> provider = _services.Create<MovieMetadataProvider>();
@@ -201,4 +249,11 @@ public sealed class MovieProvidersLiveTests : IDisposable
     }
 
     public void Dispose() => _services.Dispose();
+
+    private static MovieInfo MatrixInfo()
+    {
+        var info = new MovieInfo();
+        info.SetKinopoiskId(KnownTitles.MatrixId);
+        return info;
+    }
 }

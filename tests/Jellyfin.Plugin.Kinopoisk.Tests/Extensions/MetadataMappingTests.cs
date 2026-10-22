@@ -5,9 +5,11 @@ using Jellyfin.Plugin.Kinopoisk.Api.Models;
 using Jellyfin.Plugin.Kinopoisk.Common;
 using Jellyfin.Plugin.Kinopoisk.Configuration;
 using Jellyfin.Plugin.Kinopoisk.Extensions;
+using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Providers;
+using MediaBrowser.Model.Entities;
 using Xunit;
 
 namespace Jellyfin.Plugin.Kinopoisk.Tests.Extensions;
@@ -245,6 +247,69 @@ public sealed class MetadataMappingTests
         Assert.Equal("Up", sameTitle.ToSearchResult().Name);
         Assert.Equal(Constants.ProviderName, film.ToSearchResult().SearchProviderName);
         Assert.DoesNotContain(new FilmInfo().GetArtwork(), i => i.Url is not null);
+    }
+
+    [Fact]
+    public void FillSeriesRun_UsesTheLastRunForStatusAndEndYear()
+    {
+        // A revived series: Kinopoisk lists every run, the last one decides.
+        var series = new Series();
+
+        series.FillSeriesRun(new FilmInfo { ReleaseYears = [new FilmYearsRange(1990, 1991), new FilmYearsRange(2017, null)] });
+
+        Assert.Equal(SeriesStatus.Continuing, series.Status);
+        Assert.Null(series.EndDate);
+    }
+
+    [Fact]
+    public void FillSeriesRun_WithoutReleaseYearsLeavesStatusAndEndDateEmpty()
+    {
+        var series = new Series();
+
+        series.FillSeriesRun(new FilmInfo { SeriesDuration = 0 });
+
+        Assert.Null(series.Status);
+        Assert.Null(series.EndDate);
+        Assert.Null(series.RunTimeTicks);
+    }
+
+    [Fact]
+    public void FillFrom_Top250TagIsAddedOnceNextToExistingTags()
+    {
+        var film = new FilmInfo { Id = 1, RatingLists = new FilmRatingLists(new FilmListEntry("top250", 33)) };
+        var result = MetadataResultExtensions.CreateResult<Movie>();
+        result.Item.Tags = ["Избранное", Constants.Top250Tag];
+
+        result.FillFrom(film, new PluginConfiguration { TagTop250 = true });
+
+        Assert.Equal(["Избранное", Constants.Top250Tag], result.Item.Tags);
+    }
+
+    [Fact]
+    public void FilmRatingLists_PositionZeroIsNotInTop250()
+        => Assert.False(new FilmRatingLists(new FilmListEntry("top250", 0)).IsInTop250);
+
+    [Fact]
+    public void FillFrom_PersonBiographySkipsEmptyFactsAndKeepsTheLimit()
+    {
+        var facts = new[] { " ", "<b></b>" }.Concat(Enumerable.Range(1, 15).Select(i => $"Факт {i}")).ToList();
+        var result = MetadataResultExtensions.CreateResult<Person>();
+
+        result.FillFrom(new FilmPerson { Id = 1, Facts = facts }, new PluginConfiguration { IncludePersonBiography = true });
+
+        var paragraphs = result.Item.Overview!.Split("\n\n");
+        Assert.Equal(Constants.PersonBiographyFacts, paragraphs.Length);
+        Assert.Equal("Факт 1", paragraphs[0]);
+    }
+
+    [Fact]
+    public void FillFrom_PersonWithUnparsableDeathDateHasNoEndDate()
+    {
+        var result = MetadataResultExtensions.CreateResult<Person>();
+
+        result.FillFrom(new FilmPerson { Id = 1, DeathDate = "unknown" }, _defaults);
+
+        Assert.Null(result.Item.EndDate);
     }
 
     private static FilmCrewMembers Crew(FilmPerson person) => new([new FilmCrewMember(person)]);

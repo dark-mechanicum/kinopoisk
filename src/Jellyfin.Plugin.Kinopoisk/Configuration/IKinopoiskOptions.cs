@@ -24,4 +24,10 @@ public interface IKinopoiskOptions
 
     /// <summary>Gets the preferred source of the community rating; the other one is the fallback.</summary>
     RatingSource CommunityRating { get; }
+
+    /// <summary>Gets a value indicating whether titles in a Kinopoisk Top-250 get a tag.</summary>
+    bool TagTop250 { get; }
+
+    /// <summary>Gets a value indicating whether a person's overview is built from the Kinopoisk facts.</summary>
+    bool IncludePersonBiography { get; }
 }

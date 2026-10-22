@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Kinopoisk.Api;
+using Jellyfin.Plugin.Kinopoisk.Common;
 using Xunit;
 
 namespace Jellyfin.Plugin.Kinopoisk.Tests.Api;
@@ -123,6 +124,75 @@ public sealed class SeriesAndPersonApiLiveTests : IDisposable
         var series = await Client.GetSeriesAsync(KnownTitles.GameOfThronesId, _token);
 
         Assert.Contains("HBO", series.Distribution?.CompanyNames ?? []);
+    }
+
+    [Theory]
+    [InlineData(KnownTitles.GameOfThronesId, 50, 60)]
+    [InlineData(KnownTitles.ChernobylId, 55, 65)]
+    [InlineData(KnownTitles.SimpsonsId, 20, 25)]
+    public async Task TvSeriesBaseInfo_ReturnsEpisodeLength(int seriesId, int minMinutes, int maxMinutes)
+    {
+        var series = await Client.GetSeriesAsync(seriesId, _token);
+
+        Assert.InRange(series.SeriesDuration ?? 0, minMinutes, maxMinutes);
+    }
+
+    [Fact]
+    public async Task TvSeriesBaseInfo_RunningSeriesHasOpenReleaseYears()
+    {
+        var series = await Client.GetSeriesAsync(KnownTitles.SimpsonsId, _token);
+
+        var run = Assert.Single(series.ReleaseYears ?? []);
+        Assert.Equal(1989, run.Start);
+        Assert.Null(run.End);
+    }
+
+    [Fact]
+    public async Task TvSeriesBaseInfo_ReturnsSeriesTop250Position()
+    {
+        var series = await Client.GetSeriesAsync(KnownTitles.GameOfThronesId, _token);
+
+        Assert.True(series.RatingLists?.IsInTop250);
+        Assert.Equal("series-top250", series.RatingLists?.Top250?.MovieListSlug);
+        Assert.InRange(series.RatingLists?.Top250?.Position ?? 0, 1, 250);
+    }
+
+    [Fact]
+    public async Task TvSeriesBaseInfo_SeriesOutsideTop250HasNoPosition()
+    {
+        var series = await Client.GetSeriesAsync(KnownTitles.SimpsonsId, _token);
+
+        Assert.NotEqual(true, series.RatingLists?.IsInTop250);
+    }
+
+    [Fact]
+    public async Task PersonApi_ReturnsDeathDateOfDeceasedPerson()
+    {
+        var person = await Client.GetPersonAsync(KnownTitles.HeathLedgerId, _token);
+
+        Assert.Equal("Хит Леджер", person.Name);
+        Assert.Equal("1979-04-04", person.BirthDate);
+        Assert.Equal("2008-01-22", person.DeathDate);
+    }
+
+    [Fact]
+    public async Task PersonApi_LivingPersonHasNoDeathDate()
+    {
+        var person = await Client.GetPersonAsync(KnownTitles.KeanuReevesId, _token);
+
+        Assert.Null(person.DeathDate);
+    }
+
+    [Fact]
+    public async Task PersonApi_ReturnsFactsWithKinopoiskLinks()
+    {
+        var person = await Client.GetPersonAsync(KnownTitles.KeanuReevesId, _token);
+
+        Assert.True(person.Facts?.Count > Constants.PersonBiographyFacts);
+        Assert.All(person.Facts ?? [], fact => Assert.False(string.IsNullOrWhiteSpace(fact)));
+
+        // Facts link to other Kinopoisk pages; the provider must strip that markup.
+        Assert.Contains(person.Facts ?? [], fact => fact.Contains("<a ", StringComparison.Ordinal));
     }
 
     public void Dispose() => _services.Dispose();

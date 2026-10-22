@@ -128,6 +128,33 @@ public sealed class FilmApiLiveTests : IDisposable
         Assert.NotNull(page.Gallery?.Logos?.Horizontal?.Url);
     }
 
+    [Fact]
+    public async Task FilmBaseInfo_ReturnsTop250Position()
+    {
+        var film = await Client.GetFilmAsync(KnownTitles.MatrixId, _token);
+
+        Assert.True(film.RatingLists?.IsInTop250);
+        Assert.Equal("top250", film.RatingLists?.Top250?.MovieListSlug);
+        Assert.InRange(film.RatingLists?.Top250?.Position ?? 0, 1, 250);
+    }
+
+    [Fact]
+    public async Task FilmBaseInfo_FilmOutsideTop250HasNoPosition()
+    {
+        var film = await Client.GetFilmAsync(KnownTitles.NeznaykaUchitsyaId, _token);
+
+        Assert.NotNull(film.RatingLists);
+        Assert.False(film.RatingLists.IsInTop250);
+    }
+
+    [Fact]
+    public async Task FilmBaseInfo_FilmHasNoSeriesEpisodeLength()
+    {
+        var film = await Client.GetFilmAsync(KnownTitles.MatrixId, _token);
+
+        Assert.Null(film.SeriesDuration);
+    }
+
     [Theory]
     [InlineData(FilmImageType.Poster)]
     [InlineData(FilmImageType.Cover)]

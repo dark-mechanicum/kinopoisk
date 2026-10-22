@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Jellyfin.Data.Enums;
@@ -6,7 +7,9 @@ using Jellyfin.Plugin.Kinopoisk.Api.Models;
 using Jellyfin.Plugin.Kinopoisk.Common;
 using Jellyfin.Plugin.Kinopoisk.Configuration;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Providers;
+using MediaBrowser.Model.Entities;
 
 namespace Jellyfin.Plugin.Kinopoisk.Extensions;
 
@@ -15,6 +18,8 @@ namespace Jellyfin.Plugin.Kinopoisk.Extensions;
 /// </summary>
 public static class MetadataResultExtensions
 {
+    private const string BiographyParagraphSeparator = "\n\n";
+
     // Jellyfin 12.2 has no cinematographer kind; such people show up under "Crew" with the role as caption.
     private static readonly (Func<FilmInfo, FilmCrewMembers?> Members, PersonKind Kind, string? Role)[] _credits =
     [
@@ -87,7 +92,32 @@ public static class MetadataResultExtensions
             result.AddPeople(members(film), kind, role);
         }
 
+        if (options.TagTop250 && film.RatingLists?.IsInTop250 == true)
+        {
+            item.Tags = [.. item.Tags.Append(Constants.Top250Tag).Distinct(StringComparer.OrdinalIgnoreCase)];
+        }
+
         result.HasMetadata = true;
+    }
+
+    /// <summary>
+    /// Fills what only a series has: the episode length, whether it still runs and the year it ended.
+    /// </summary>
+    /// <param name="series">The series.</param>
+    /// <param name="film">The series as Kinopoisk returns it.</param>
+    public static void FillSeriesRun(this Series series, FilmInfo film)
+    {
+        if (film.SeriesDuration is > 0 and var minutes)
+        {
+            series.RunTimeTicks = TimeSpan.FromMinutes(minutes).Ticks;
+        }
+
+        // The last range is the current run; a range without an end year means the series is still on air.
+        if (film.ReleaseYears is [.., var lastRun])
+        {
+            series.Status = lastRun.End is null ? SeriesStatus.Continuing : SeriesStatus.Ended;
+            series.EndDate = lastRun.End is { } endYear ? MidYear(endYear) : null;
+        }
     }
 
     /// <summary>
@@ -96,7 +126,8 @@ public static class MetadataResultExtensions
     /// <typeparam name="T">The item type.</typeparam>
     /// <param name="result">The result.</param>
     /// <param name="person">The person.</param>
-    public static void FillFrom<T>(this MetadataResult<T> result, FilmPerson person)
+    /// <param name="options">The plugin options.</param>
+    public static void FillFrom<T>(this MetadataResult<T> result, FilmPerson person, IKinopoiskOptions options)
         where T : BaseItem
     {
         var item = result.Item;
@@ -104,9 +135,15 @@ public static class MetadataResultExtensions
         item.Name = person.Name;
         item.OriginalTitle = person.OriginalName;
         item.PremiereDate = ParseDate(person.BirthDate);
+        item.EndDate = ParseDate(person.DeathDate);
         if (!string.IsNullOrWhiteSpace(person.BirthPlace))
         {
             item.ProductionLocations = [person.BirthPlace];
+        }
+
+        if (options.IncludePersonBiography)
+        {
+            item.Overview = ToBiography(person.Facts);
         }
 
         result.HasMetadata = true;
@@ -151,6 +188,20 @@ public static class MetadataResultExtensions
     }
 
     private static DateTime? ParseDate(FilmIncompleteDate? date) => ParseDate(date?.Date);
+
+    // Kinopoisk only knows the end year. Mid-year noon UTC shows that year in every time zone; 1 January would be
+    // the previous year west of Greenwich.
+    private static DateTime MidYear(int year) => new(year, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+
+    private static string? ToBiography(IReadOnlyList<string>? facts)
+    {
+        var paragraphs = (facts ?? [])
+            .Select(fact => fact.ToPlainText())
+            .Where(fact => fact.Length > 0)
+            .Take(Constants.PersonBiographyFacts);
+        var biography = string.Join(BiographyParagraphSeparator, paragraphs);
+        return biography.Length > 0 ? biography : null;
+    }
 
     private static DateTime? ParseDate(string? date)
         => DateTime.TryParse(date, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var value)

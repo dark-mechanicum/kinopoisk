@@ -47,4 +47,13 @@ public static class KnownTitles
 
     /// <summary>Холли Барио: Kinopoisk has no photo and returns a placeholder SVG.</summary>
     public const int PhotolessPersonId = 544474;
+
+    /// <summary>«Чернобыль» / Chernobyl (2019), a miniseries: one run, 59-minute episodes, in the series Top-250.</summary>
+    public const int ChernobylId = 1227803;
+
+    /// <summary>«Симпсоны» / The Simpsons (1989-): still on air, 22-minute episodes, not in the Top-250.</summary>
+    public const int SimpsonsId = 77164;
+
+    /// <summary>Heath Ledger (1979-2008).</summary>
+    public const int HeathLedgerId = 1183;
 }

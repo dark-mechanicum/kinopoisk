@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text.RegularExpressions;
 
 namespace Jellyfin.Plugin.Kinopoisk.Extensions;
 
 /// <summary>
-/// Turns a media file name into search keywords or an explicit Kinopoisk id.
+/// Turns a media file name into search keywords or an explicit Kinopoisk id, and Kinopoisk text into plain text.
 /// </summary>
 public static partial class StringExtensions
 {
@@ -42,6 +43,14 @@ public static partial class StringExtensions
     /// <returns>The name with a capital first letter.</returns>
     public static string ToGenreName(this string name)
         => string.IsNullOrEmpty(name) ? name : char.ToUpper(name[0], _russianCulture) + name[1..];
+
+    /// <summary>
+    /// Turns a Kinopoisk HTML fragment into plain text: «сестры <c>&lt;a href="/name/1/"&gt;Ким&lt;/a&gt;</c>» → «сестры Ким».
+    /// </summary>
+    /// <param name="html">The fragment.</param>
+    /// <returns>The text without tags, with entities decoded and spaces collapsed.</returns>
+    public static string ToPlainText(this string html)
+        => Whitespace().Replace(WebUtility.HtmlDecode(HtmlTag().Replace(html, string.Empty)), " ").Trim();
 
     /// <summary>
     /// Builds (title, year) search candidates from a file path, best candidates first.
@@ -154,4 +163,10 @@ public static partial class StringExtensions
 
     [GeneratedRegex(@"(?<![\p{L}\p{N}])(?:kp|kinopoisk)(?:id)?[-_=]?(?<id>\d+)(?![\p{L}\p{N}])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex KinopoiskIdTag();
+
+    [GeneratedRegex(@"<[^>]*>")]
+    private static partial Regex HtmlTag();
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex Whitespace();
 }

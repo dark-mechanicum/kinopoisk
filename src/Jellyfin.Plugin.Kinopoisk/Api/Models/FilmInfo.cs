@@ -70,6 +70,12 @@ public sealed record FilmInfo : BaseMetadata
     /// <summary>Gets the release years (series).</summary>
     public IReadOnlyList<FilmYearsRange>? ReleaseYears { get; init; }
 
+    /// <summary>Gets the typical episode length in minutes (series).</summary>
+    public int? SeriesDuration { get; init; }
+
+    /// <summary>Gets the Kinopoisk rating lists the title is in.</summary>
+    public FilmRatingLists? RatingLists { get; init; }
+
     /// <summary>Gets the tagline.</summary>
     public string? Tagline { get; init; }
 

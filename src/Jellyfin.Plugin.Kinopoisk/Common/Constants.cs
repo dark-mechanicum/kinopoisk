@@ -50,4 +50,14 @@ public static class Constants
     /// Without it Kinopoisk intermittently answers with no suggestions at all.
     /// </summary>
     public const int YandexCityId = 213;
+
+    /// <summary>
+    /// The tag given to titles in the Kinopoisk Top-250 of films or of series.
+    /// </summary>
+    public const string Top250Tag = "Топ-250 КиноПоиска";
+
+    /// <summary>
+    /// The number of Kinopoisk facts that make up a person's overview; the full list can run to dozens.
+    /// </summary>
+    public const int PersonBiographyFacts = 10;
 }

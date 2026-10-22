@@ -28,5 +28,11 @@ internal sealed class PluginOptions : IKinopoiskOptions
     /// <inheritdoc />
     public RatingSource CommunityRating => Current.CommunityRating;
 
+    /// <inheritdoc />
+    public bool TagTop250 => Current.TagTop250;
+
+    /// <inheritdoc />
+    public bool IncludePersonBiography => Current.IncludePersonBiography;
+
     private static PluginConfiguration Current => Plugin.Instance?.Configuration ?? _defaults;
 }

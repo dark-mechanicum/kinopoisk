@@ -50,6 +50,13 @@ Download `jellyfin-plugin-kinopoisk_<version>.zip` matching your Jellyfin versio
 - Genres get a capital first letter («Фантастика»), so they merge with genres from other providers. Items fetched before
   12.2.2.0 keep the lowercase genres until a «Replace all metadata» refresh.
 - Kinopoisk's "no photo" placeholders are never saved as images.
+- **Series** get the episode length as their runtime, «Завершён» / «Продолжается» (Ended / Continuing) and the end year
+  from Kinopoisk's release years. Kinopoisk only knows the year, so the end date is 1 July of that year. Movies and
+  episodes take their runtime from the media file: Jellyfin ignores a provider runtime for videos.
+- **People** get their death date, so Jellyfin shows the date and age at death. With «Биография персон» enabled the
+  overview is built from the first 10 Kinopoisk facts, as plain text without Kinopoisk's links.
+- With «Тег Топ-250» enabled, films and series in a Kinopoisk Top-250 get the tag **«Топ-250 КиноПоиска»**. Jellyfin adds
+  tags to the existing ones, so a title that later drops out of the list keeps the tag until «Replace all metadata».
 - Responses are cached for an hour; requests are sent one at a time and retried with backoff on 429, 5xx, timeouts and
   network errors. An outdated Kinopoisk id is logged as one warning line, not as an error.
 
@@ -71,8 +78,14 @@ cached responses expire within an hour.
 | Community rating                    | Kinopoisk | Kinopoisk or IMDb rating first; the other is the fallback.               |
 | Capitalize genres                   | on        | «Фантастика» instead of «фантастика».                                    |
 | Dubbing actors                      | off       | Adds the Russian voice cast with role «Озвучка».                         |
+| Top-250 tag                         | off       | Tags titles in a Kinopoisk Top-250 with «Топ-250 КиноПоиска».            |
+| Person biography                    | off       | Builds a person's overview from Kinopoisk facts, replacing the old one.  |
 | Pause between requests, ms (0–5000) | 0         | Raise it if Kinopoisk answers `429 Too Many Requests` during big scans.  |
 | Prefer IPv4                         | off       | Connects over IPv4 first; helps when IPv6 is broken and images time out. |
+
+New fields (series runtime, status and end date, death dates) fill in on the next «Search for missing metadata»
+refresh. When «КиноПоиск» is the first metadata fetcher, any refresh also replaces values other providers set before,
+e.g. the exact end date of a series with Kinopoisk's end year.
 
 ## Kinopoisk id in file and folder names
 
