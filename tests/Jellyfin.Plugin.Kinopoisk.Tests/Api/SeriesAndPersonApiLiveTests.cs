@@ -46,13 +46,74 @@ public sealed class SeriesAndPersonApiLiveTests : IDisposable
     [Fact]
     public async Task TvSeriesEpisodes_ReturnsFinale()
     {
-        var episodes = await Client.GetLatestEpisodesAsync(KnownTitles.GameOfThronesId, _token);
+        var episodes = await Client.GetSeriesEpisodesAsync(KnownTitles.GameOfThronesId, _token);
 
         var finale = Assert.Single(episodes, e => e is { Number: 6, Season.Number: 8 });
+        Assert.Equal(KnownTitles.GameOfThronesFinaleId, finale.Id);
         Assert.Equal("Железный Трон", finale.Title?.Russian);
         Assert.Equal("The Iron Throne", finale.Title?.Original);
         Assert.Equal("2019-05-19", finale.ReleaseDate?.Date);
     }
+
+    [Fact]
+    public async Task TvSeriesEpisodes_IncludesAnnouncedEpisodes()
+    {
+        var episodes = await Client.GetSeriesEpisodesAsync(KnownTitles.ApothecaryDiariesId, _token);
+
+        // More than one capped list of 30: the announced episodes come with the released ones.
+        Assert.True(episodes.Count > 30);
+        var announced = Assert.Single(episodes, e => e is { Number: 3, Season.Number: 3 });
+        Assert.Equal(KnownTitles.ApothecaryDiariesS3E3Id, announced.Id);
+    }
+
+    [Fact]
+    public async Task TvSeriesEpisodes_EndedMiniseriesHasEveryEpisodeOnce()
+    {
+        var episodes = await Client.GetSeriesEpisodesAsync(KnownTitles.ChernobylId, _token);
+
+        Assert.Equal(Enumerable.Range(1, 5), episodes.Select(e => e.Number).Order());
+        Assert.All(episodes, e => Assert.Equal(1, e.Season?.Number));
+        Assert.All(episodes, e => Assert.True(e.Id > 0));
+    }
+
+    [Fact]
+    public async Task EpisodeGuide_ReturnsEverySeasonWithTitlesAndDates()
+    {
+        var episodes = await Client.GetEpisodeGuideAsync(KnownTitles.GameOfThronesId, _token);
+
+        var seasonLengths = episodes.GroupBy(e => e.Season?.Number).OrderBy(g => g.Key).Select(g => g.Count());
+        Assert.Equal(KnownTitles.GameOfThronesSeasonLengths, seasonLengths);
+        var pilot = Assert.Single(episodes, e => e is { Number: 1, Season.Number: 1 });
+        Assert.Equal("Зима близко", pilot.Title?.Russian);
+        Assert.Equal("Winter Is Coming", pilot.Title?.Original);
+        Assert.Equal("2011-04-17", pilot.ReleaseDate?.Date);
+        Assert.Equal("DAY", pilot.ReleaseDate?.Accuracy);
+        Assert.All(episodes, e => Assert.False(string.IsNullOrWhiteSpace(e.Title?.Display)));
+    }
+
+    [Fact]
+    public async Task EpisodeGuide_OlderEpisodesThanTheEpisodeListsReach()
+    {
+        var episodes = await Client.GetEpisodeGuideAsync(KnownTitles.ApothecaryDiariesId, _token);
+
+        Assert.Equal(72, episodes.Count);
+        var first = Assert.Single(episodes, e => e is { Number: 1, Season.Number: 1 });
+        Assert.Equal("Маомао", first.Title?.Russian);
+        Assert.Equal("2023-10-21", first.ReleaseDate?.Date);
+    }
+
+    [Fact]
+    public async Task EpisodeGuide_LongRunningSeriesIsOnOnePage()
+    {
+        var episodes = await Client.GetEpisodeGuideAsync(KnownTitles.SimpsonsId, _token);
+
+        Assert.True(episodes.Count >= KnownTitles.SimpsonsEpisodesListed);
+        Assert.Equal(episodes.Count, episodes.DistinctBy(e => (e.Season?.Number, e.Number)).Count());
+    }
+
+    [Fact]
+    public async Task EpisodeGuide_FilmHasNoEpisodes()
+        => Assert.Empty(await Client.GetEpisodeGuideAsync(KnownTitles.MatrixId, _token));
 
     [Fact]
     [Trait("Category", StreamingCatalog.Category)]

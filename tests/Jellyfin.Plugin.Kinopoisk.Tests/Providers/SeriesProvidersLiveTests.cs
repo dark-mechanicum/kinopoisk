@@ -221,7 +221,86 @@ public sealed class SeriesProvidersLiveTests : IDisposable
         Assert.False(result.HasMetadata);
     }
 
+    [Fact]
+    public async Task Episode_Announced_GetsItsKinopoiskId()
+    {
+        IRemoteMetadataProvider<Episode, EpisodeInfo> provider = _services.Create<EpisodeMetadataProvider>();
+
+        var result = await provider.GetMetadata(SeriesEpisode(KnownTitles.ApothecaryDiariesId, 3, 3), _token);
+
+        Assert.True(result.HasMetadata);
+        Assert.True(result.Item.TryGetKinopoiskId(out var id));
+        Assert.Equal(KnownTitles.ApothecaryDiariesS3E3Id, id);
+        Assert.Equal(3, result.Item.ParentIndexNumber);
+        Assert.Equal(3, result.Item.IndexNumber);
+    }
+
+    [Fact]
+    public async Task Episode_OlderThanTheEpisodeLists_FilledFromEpisodeGuide()
+    {
+        IRemoteMetadataProvider<Episode, EpisodeInfo> provider = _services.Create<EpisodeMetadataProvider>();
+
+        var result = await provider.GetMetadata(SeriesEpisode(KnownTitles.GameOfThronesId, 1, 1), _token);
+
+        Assert.True(result.HasMetadata);
+        Assert.Equal("Зима близко", result.Item.Name);
+        Assert.Equal("Winter Is Coming", result.Item.OriginalTitle);
+        Assert.Equal(new DateTime(2011, 4, 17, 0, 0, 0, DateTimeKind.Utc), result.Item.PremiereDate);
+        Assert.Equal(2011, result.Item.ProductionYear);
+
+        // The episodes page has no ids; a made-up one would be worse than none.
+        Assert.False(result.Item.TryGetKinopoiskId(out _));
+    }
+
+    [Fact]
+    public async Task Episode_StoredKinopoiskId_WinsOverNumbersWhichAreKept()
+    {
+        IRemoteMetadataProvider<Episode, EpisodeInfo> provider = _services.Create<EpisodeMetadataProvider>();
+        var info = SeriesEpisode(KnownTitles.GameOfThronesId, 1, 1);
+        info.SetKinopoiskId(KnownTitles.GameOfThronesFinaleId);
+
+        var result = await provider.GetMetadata(info, _token);
+
+        Assert.True(result.HasMetadata);
+        Assert.Equal("Железный Трон", result.Item.Name);
+        Assert.True(result.Item.TryGetKinopoiskId(out var id));
+        Assert.Equal(KnownTitles.GameOfThronesFinaleId, id);
+        Assert.Equal(1, result.Item.ParentIndexNumber);
+        Assert.Equal(1, result.Item.IndexNumber);
+    }
+
+    [Fact]
+    public async Task Episode_UnknownNumber_ReturnsEmptyResult()
+    {
+        IRemoteMetadataProvider<Episode, EpisodeInfo> provider = _services.Create<EpisodeMetadataProvider>();
+
+        var result = await provider.GetMetadata(SeriesEpisode(KnownTitles.ChernobylId, 1, 99), _token);
+
+        Assert.False(result.HasMetadata);
+    }
+
+    [Fact]
+    [Trait("Category", StreamingCatalog.Category)]
+    public async Task Episode_SeriesWithoutStoredContentId_StillUsesItsSeason()
+    {
+        await StreamingCatalog.SkipUnlessAvailableAsync(_services.Client, _token);
+        var provider = _services.Create<EpisodeMetadataProvider>();
+
+        // Series fetched by older plugin versions have no content UUID: it is looked up from the series.
+        var found = await provider.FindEpisodeAsync(SeriesEpisode(KnownTitles.MetodId, 1, 16), _token);
+
+        Assert.NotNull(found);
+        Assert.False(string.IsNullOrWhiteSpace(found.Synopsis));
+    }
+
     public void Dispose() => _services.Dispose();
+
+    private static EpisodeInfo SeriesEpisode(int seriesId, int season, int episode)
+    {
+        var info = new EpisodeInfo { ParentIndexNumber = season, IndexNumber = episode };
+        info.SeriesProviderIds[Constants.KinopoiskIdKey] = seriesId.ToString(CultureInfo.InvariantCulture);
+        return info;
+    }
 
     private async Task<MetadataResult<Series>> GetSeriesMetadataAsync(LiveServices services, int seriesId)
     {

@@ -56,4 +56,19 @@ public static class KnownTitles
 
     /// <summary>Heath Ledger (1979-2008).</summary>
     public const int HeathLedgerId = 1183;
+
+    /// <summary>Episode id of «Железный Трон» / The Iron Throne, the «Игра престолов» finale (S8E6).</summary>
+    public const int GameOfThronesFinaleId = 2046954;
+
+    /// <summary>«Монолог фармацевта» / The Apothecary Diaries (2023-): 3 seasons of 24, season 3 still announced.</summary>
+    public const int ApothecaryDiariesId = 5258557;
+
+    /// <summary>Episode id of «Монолог фармацевта» S3E3, an announced episode.</summary>
+    public const int ApothecaryDiariesS3E3Id = 14262890;
+
+    /// <summary>Number of «Симпсоны» episodes the episodes page of the site listed in October 2026; it only grows.</summary>
+    public const int SimpsonsEpisodesListed = 769;
+
+    /// <summary>«Игра престолов» episode count by season on the episodes page of the site.</summary>
+    public static readonly int[] GameOfThronesSeasonLengths = [10, 10, 10, 10, 10, 10, 7, 6];
 }

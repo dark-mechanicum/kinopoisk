@@ -36,13 +36,23 @@ Download `jellyfin-plugin-kinopoisk_<version>.zip` matching your Jellyfin versio
 | Episode | ✔        | ✔      | —                         | —                 |
 | Person  | ✔        | ✔      | photos                    | ✔                 |
 
+The Kinopoisk id field («КиноПоиск») is shown in «Edit metadata» for movies, series, episodes and people. Episodes get no
+kinopoisk.ru link: the site has no page for a single episode.
+
 - Movies without a Kinopoisk id are matched by name and year, then by file name
   (`The.Matrix.1999.1080p.BluRay.mkv` → «Матрица»). The year only ranks the matches (titles released that year come
   first), so a slightly wrong year never hides the right title.
 - A movie can also be matched to a title Kinopoisk lists as a series (e.g. multi-part cartoons like «Незнайка на Луне»).
 - An explicit Kinopoisk id in the file or folder name skips the search entirely — see below.
-- Episodes are matched by season/episode number: through the full season list for series on the Kinopoisk streaming
-  service, otherwise among the 30 most recent episodes (a Kinopoisk API limit).
+- Episodes are matched in this order:
+  1. by the Kinopoisk id typed into the episode's «КиноПоиск» field in «Edit metadata». The library's season and
+     episode numbers are kept, so this also fixes series numbered differently from Kinopoisk;
+  2. by season/episode number in the full season list, for series on the Kinopoisk streaming service;
+  3. among the 30 latest released and the 30 next announced episodes (a Kinopoisk API limit), which carry the episode's
+     Kinopoisk id;
+  4. on the series' episode list page (`kinopoisk.ru/film/{id}/episodes/`), which lists every episode with its title,
+     original title and release date, but has no episode ids or descriptions. Episodes matched here get no Kinopoisk
+     id.
 - Cast & crew include cinematographers (role «Оператор», shown under Crew — Jellyfin has no cinematographer kind) and
   designers («Художник»); dubbing actors («Озвучка») on request.
 - Studios are the networks and distributors Kinopoisk lists (e.g. «HBO», «Каро-Премьер»); Kinopoisk's API exposes no
@@ -106,6 +116,10 @@ Accepted forms: `kp301`, `kp-301`, `kp_301`, `kp=301`, `kpid-301`, `kinopoisk-30
   refresh. If Kinopoisk does not know the id, the item gets no metadata rather than a guess by name.
 - Episodes use the id of their series.
 
+The episode list page is read with the cookie `disable_server_sso_redirect=1`. Without it kinopoisk.ru redirects every
+page to the Yandex login. If Kinopoisk stops honouring it, the page is skipped with a warning and the other sources still
+work.
+
 ## Development
 
 Requires the .NET 10 SDK (see `global.json`).
@@ -129,7 +143,9 @@ the server process, so shared libraries must match what the server ships. All ve
 
 All provider and client tests call the live Kinopoisk API — nothing is mocked — so CI sees Kinopoisk changes as soon as
 they happen. They use long-lived titles (`tests/.../KnownTitles.cs`) and only check ranges for values that drift, such as
-ratings. The only fake is an HTTP handler in the retry tests: it checks the plugin's own retry logic, not Kinopoisk.
+ratings. The only fakes are an HTTP handler in the retry tests, which checks the plugin's own retry logic, and a few rows
+copied from the real episode list page, which pin parsing cases live pages do not reliably show (announced episodes
+without dates, Kinopoisk's placeholder titles).
 
 The GraphQL documents in `src/Jellyfin.Plugin.Kinopoisk/Api/Queries` are Kinopoisk's own: the server rejects any
 document it does not know (`the query is not allowed`), so they cannot be edited, only replaced with fresh copies taken

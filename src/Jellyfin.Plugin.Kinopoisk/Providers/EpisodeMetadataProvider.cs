@@ -49,6 +49,7 @@ public sealed class EpisodeMetadataProvider : IRemoteMetadataProvider<Episode, E
             if (episode is not null)
             {
                 result.FillFrom(episode);
+                KeepLibraryNumbering(result.Item, info);
             }
         }
         catch (KinopoiskApiException ex)
@@ -71,47 +72,92 @@ public sealed class EpisodeMetadataProvider : IRemoteMetadataProvider<Episode, E
         => _imageDownloader.GetAsync(url, cancellationToken);
 
     /// <summary>
-    /// Finds the episode: first in its season (series on the streaming service), then among the latest releases.
+    /// Finds the episode: by its stored Kinopoisk id, then by season and episode number in its season (series on the
+    /// streaming service), among the latest and upcoming episodes, and finally in the episodes page of the site.
     /// </summary>
     /// <param name="info">The episode info.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The episode, or null.</returns>
     public async Task<FilmEpisode?> FindEpisodeAsync(EpisodeInfo info, CancellationToken cancellationToken)
     {
-        if (info.IndexNumber is not { } number || info.ParentIndexNumber is not { } season)
-        {
-            return null;
-        }
-
         var series = new SeriesInfo { ProviderIds = info.SeriesProviderIds };
         if (!series.TryGetKinopoiskId(out var seriesId))
         {
             return null;
         }
 
-        var seasonContentId = await FindSeasonContentIdAsync(series, season, cancellationToken).ConfigureAwait(false);
-        if (seasonContentId is not null)
+        var seasonEpisodes = await GetSeasonEpisodesAsync(series, seriesId, info.ParentIndexNumber, cancellationToken).ConfigureAwait(false);
+        var seriesEpisodes = await _client.GetSeriesEpisodesAsync(seriesId, cancellationToken).ConfigureAwait(false);
+        var match = FindById(info, [.. seasonEpisodes, .. seriesEpisodes])
+            ?? FindByNumber(info, seasonEpisodes)
+            ?? FindByNumber(info, seriesEpisodes);
+        if (match is not null || info.IndexNumber is null || info.ParentIndexNumber is null)
         {
-            var seasonEpisodes = await _client.GetSeasonEpisodesAsync(seasonContentId, cancellationToken).ConfigureAwait(false);
-            var match = seasonEpisodes.FirstOrDefault(e => e.Number == number);
-            if (match is not null)
-            {
-                return match;
-            }
+            return match;
         }
 
-        var latest = await _client.GetLatestEpisodesAsync(seriesId, cancellationToken).ConfigureAwait(false);
-        return latest.FirstOrDefault(e => e.Number == number && e.Season?.Number == season);
+        var guide = await GetEpisodeGuideAsync(seriesId, cancellationToken).ConfigureAwait(false);
+        return FindByNumber(info, guide);
     }
 
-    private async Task<string?> FindSeasonContentIdAsync(SeriesInfo series, int season, CancellationToken cancellationToken)
+    // The episodes page is the last resort; when it is unavailable the episode simply stays unmatched.
+    private async Task<IReadOnlyList<FilmEpisode>> GetEpisodeGuideAsync(int seriesId, CancellationToken cancellationToken)
     {
-        if (!series.TryGetContentId(out var seriesContentId) || seriesContentId is null)
+        try
         {
-            return null;
+            return await _client.GetEpisodeGuideAsync(seriesId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (KinopoiskApiException ex)
+        {
+            LookupFailure.Log(_logger, ex, $"the episodes page of {seriesId}");
+            return [];
+        }
+    }
+
+    // An episode matched by its stored id may be numbered differently on Kinopoisk (e.g. anime with absolute
+    // numbering); the library's own numbers win, so a refresh never moves the episode.
+    private static void KeepLibraryNumbering(Episode item, EpisodeInfo info)
+    {
+        item.IndexNumber = info.IndexNumber ?? item.IndexNumber;
+        item.ParentIndexNumber = info.ParentIndexNumber ?? item.ParentIndexNumber;
+    }
+
+    private static FilmEpisode? FindById(EpisodeInfo info, IEnumerable<FilmEpisode> episodes)
+        => info.TryGetKinopoiskId(out var episodeId) ? episodes.FirstOrDefault(e => e.Id == episodeId) : null;
+
+    private static FilmEpisode? FindByNumber(EpisodeInfo info, IEnumerable<FilmEpisode> episodes)
+        => episodes.FirstOrDefault(e => e.Number == info.IndexNumber && e.Season?.Number == info.ParentIndexNumber);
+
+    private async Task<IReadOnlyList<FilmEpisode>> GetSeasonEpisodesAsync(
+        SeriesInfo series, int seriesId, int? season, CancellationToken cancellationToken)
+    {
+        if (season is null)
+        {
+            return [];
+        }
+
+        var seriesContentId = await GetContentIdAsync(series, seriesId, cancellationToken).ConfigureAwait(false);
+        if (seriesContentId is null)
+        {
+            return [];
         }
 
         var page = await _client.GetFilmPageAsync(seriesContentId, cancellationToken).ConfigureAwait(false);
-        return page.Seasons?.Items?.FirstOrDefault(s => s.Number == season)?.ContentId;
+        var seasonContentId = page.Seasons?.Items?.FirstOrDefault(s => s.Number == season)?.ContentId;
+        return seasonContentId is null
+            ? []
+            : await _client.GetSeasonEpisodesAsync(seasonContentId, cancellationToken).ConfigureAwait(false);
+    }
+
+    // Series fetched before the content UUID was stored have none yet; Kinopoisk returns it with the series.
+    private async Task<string?> GetContentIdAsync(SeriesInfo series, int seriesId, CancellationToken cancellationToken)
+    {
+        if (series.TryGetContentId(out var storedContentId) && !string.IsNullOrWhiteSpace(storedContentId))
+        {
+            return storedContentId;
+        }
+
+        var seriesInfo = await _client.GetSeriesAsync(seriesId, cancellationToken).ConfigureAwait(false);
+        return string.IsNullOrWhiteSpace(seriesInfo.ContentId) ? null : seriesInfo.ContentId;
     }
 }

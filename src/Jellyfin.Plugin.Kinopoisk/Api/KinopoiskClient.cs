@@ -17,7 +17,7 @@ public sealed class KinopoiskClient : IKinopoiskClient
 {
     private const int SuggestLimit = 10;
     private const int ImagesPageSize = 50;
-    private const int LatestEpisodesLimit = 30;
+    private const int EpisodesListLimit = 30;
     private const int SeasonPageSize = 50;
     private const int MaxSeasonPages = 20;
 
@@ -142,15 +142,19 @@ public sealed class KinopoiskClient : IKinopoiskClient
             cancellationToken));
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<FilmEpisode>> GetLatestEpisodesAsync(int seriesId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<FilmEpisode>> GetSeriesEpisodesAsync(int seriesId, CancellationToken cancellationToken)
     {
-        var page = await CachedAsync($"latest:{seriesId}", () => _transport.QueryAsync<FilmEpisodes>(
+        var lists = await CachedAsync($"episodes:{seriesId}", () => _transport.QueryAsync<FilmEpisodeLists>(
             "TvSeriesEpisodes",
-            new { tvSeriesId = seriesId, episodesLimit = LatestEpisodesLimit },
-            "data.tvSeries.releasedEpisodes",
+            new { tvSeriesId = seriesId, episodesLimit = EpisodesListLimit },
+            "data.tvSeries",
             cancellationToken)).ConfigureAwait(false);
-        return page.Items ?? [];
+        return [.. lists.ReleasedEpisodes?.Items ?? [], .. lists.FutureEpisodes?.Items ?? []];
     }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<FilmEpisode>> GetEpisodeGuideAsync(int seriesId, CancellationToken cancellationToken)
+        => CachedAsync($"guide:{seriesId}", () => FetchEpisodeGuideAsync(seriesId, cancellationToken));
 
     /// <inheritdoc />
     public Task<IReadOnlyList<FilmEpisode>> GetSeasonEpisodesAsync(string seasonContentId, CancellationToken cancellationToken)
@@ -177,6 +181,30 @@ public sealed class KinopoiskClient : IKinopoiskClient
             {
                 break;
             }
+        }
+
+        return episodes;
+    }
+
+    private async Task<IReadOnlyList<FilmEpisode>> FetchEpisodeGuideAsync(int seriesId, CancellationToken cancellationToken)
+    {
+        string html;
+        try
+        {
+            html = await _transport.GetHtmlAsync($"film/{seriesId}/episodes/", cancellationToken).ConfigureAwait(false);
+        }
+        catch (KinopoiskApiException ex) when (ex.Kind == KinopoiskErrorKind.NotFound)
+        {
+            // Films, and series Kinopoisk lists without episodes, have no episodes page.
+            return [];
+        }
+
+        var episodes = EpisodeGuideParser.Parse(html);
+        if (episodes.Count == 0 && EpisodeGuideParser.IsLoginPage(html))
+        {
+            // Kinopoisk gave up the login-redirect opt-out cookie for this request; the next refresh may pass again.
+            throw new KinopoiskApiException(
+                $"Kinopoisk sent the Yandex login page instead of the episodes of {seriesId}.", KinopoiskErrorKind.Transient);
         }
 
         return episodes;

@@ -26,8 +26,12 @@ public sealed class KinopoiskTransport : IDisposable
 
     private const string GraphQlUrl = "https://graphql.kinopoisk.ru/graphql";
     private const string RestUrl = Constants.SiteUrl + "/api/";
+    private const string PageUrl = Constants.SiteUrl + "/";
     private const string QueryResourcePrefix = "Jellyfin.Plugin.Kinopoisk.Api.Queries.";
     private const int MaxAttempts = 3;
+
+    // Without it every kinopoisk.ru page redirects to the Yandex login (sso.passport.yandex.ru) instead of rendering.
+    private const string SsoRedirectOptOutCookie = "disable_server_sso_redirect=1";
 
     private static readonly ConcurrentDictionary<string, string> _queries = new(StringComparer.Ordinal);
 
@@ -90,6 +94,26 @@ public sealed class KinopoiskTransport : IDisposable
             cancellationToken).ConfigureAwait(false);
 
         return KinopoiskJson.Deserialize<T>(KinopoiskJson.Parse(text), resource);
+    }
+
+    /// <summary>
+    /// Gets a kinopoisk.ru HTML page.
+    /// </summary>
+    /// <param name="path">The page path relative to the site, e.g. <c>film/301/episodes/</c>.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The HTML.</returns>
+    public Task<string> GetHtmlAsync(string path, CancellationToken cancellationToken)
+    {
+        _logger.LogDebug("Page {Path}", path);
+        return SendAsync(
+            RestClientName,
+            () =>
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, PageUrl + path);
+                request.Headers.Add("Cookie", SsoRedirectOptOutCookie);
+                return request;
+            },
+            cancellationToken);
     }
 
     /// <inheritdoc />

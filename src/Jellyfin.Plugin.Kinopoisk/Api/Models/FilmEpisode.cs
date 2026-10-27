@@ -7,7 +7,8 @@ using MediaBrowser.Model.Providers;
 namespace Jellyfin.Plugin.Kinopoisk.Api.Models;
 
 /// <summary>
-/// A series episode, from <c>TvSeriesEpisodes</c> or <c>SerialStructureSeason</c>.
+/// A series episode, from <c>TvSeriesEpisodes</c>, <c>SerialStructureSeason</c> or the episodes page of the site
+/// (which has no id: <see cref="BaseMetadata.Id"/> stays 0).
 /// </summary>
 public sealed record FilmEpisode : BaseMetadata
 {

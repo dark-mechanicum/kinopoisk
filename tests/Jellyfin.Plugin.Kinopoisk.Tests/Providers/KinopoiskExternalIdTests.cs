@@ -18,14 +18,15 @@ public sealed class KinopoiskExternalIdTests
         => Assert.Equal("kinopoisk", _externalId.Key);
 
     [Fact]
-    public void Supports_MoviesSeriesAndPersons()
+    public void Supports_MoviesSeriesEpisodesAndPersons()
     {
         Assert.True(_externalId.Supports(new Movie()));
         Assert.True(_externalId.Supports(new Series()));
+        Assert.True(_externalId.Supports(new Episode()));
         Assert.True(_externalId.Supports(new Person()));
     }
 
     [Fact]
-    public void Supports_NotEpisodes()
-        => Assert.False(_externalId.Supports(new Episode()));
+    public void Supports_NotSeasons()
+        => Assert.False(_externalId.Supports(new Season()));
 }

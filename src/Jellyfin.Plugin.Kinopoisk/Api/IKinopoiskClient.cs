@@ -69,12 +69,21 @@ public interface IKinopoiskClient
     Task<FilmImages> GetImagesAsync(int id, FilmImageType type, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Gets the most recently released episodes of a series (Kinopoisk caps the list at 30).
+    /// Gets the latest released and the next announced episodes of a series, with their ids
+    /// (Kinopoisk caps each list at 30).
     /// </summary>
     /// <param name="seriesId">The Kinopoisk id.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>The episodes, newest first.</returns>
-    Task<IReadOnlyList<FilmEpisode>> GetLatestEpisodesAsync(int seriesId, CancellationToken cancellationToken);
+    /// <returns>The released episodes newest first, then the announced ones oldest first.</returns>
+    Task<IReadOnlyList<FilmEpisode>> GetSeriesEpisodesAsync(int seriesId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets every episode of a series from the episodes page of the site: titles and release dates, without ids.
+    /// </summary>
+    /// <param name="seriesId">The Kinopoisk id.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The episodes by season; empty when Kinopoisk has no episodes page for the title (e.g. a film).</returns>
+    Task<IReadOnlyList<FilmEpisode>> GetEpisodeGuideAsync(int seriesId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets every episode of a season available on the streaming service.

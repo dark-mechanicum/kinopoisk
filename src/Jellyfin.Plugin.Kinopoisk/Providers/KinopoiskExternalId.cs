@@ -9,7 +9,8 @@ using MediaBrowser.Model.Providers;
 namespace Jellyfin.Plugin.Kinopoisk.Providers;
 
 /// <summary>
-/// Declares the Kinopoisk id, so Jellyfin shows it in "Edit metadata" and "Identify" of movies, series and persons.
+/// Declares the Kinopoisk id, so Jellyfin shows it in "Edit metadata" and "Identify" of movies, series, episodes
+/// and persons.
 /// </summary>
 public sealed class KinopoiskExternalId : IExternalId
 {
@@ -23,5 +24,5 @@ public sealed class KinopoiskExternalId : IExternalId
     public ExternalIdMediaType? Type => null;
 
     /// <inheritdoc />
-    public bool Supports(IHasProviderIds item) => item is Movie or Series or Person;
+    public bool Supports(IHasProviderIds item) => item is Movie or Series or Episode or Person;
 }
