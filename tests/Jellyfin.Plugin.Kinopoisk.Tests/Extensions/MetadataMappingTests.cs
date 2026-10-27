@@ -31,8 +31,55 @@ public sealed class MetadataMappingTests
     [InlineData(null, "age16", "16+")]
     [InlineData("", "age0", "0+")]
     [InlineData(null, null, null)]
-    public void OfficialRating_PrefersMpaaThenRussianAge(string? mpaa, string? age, string? expected)
-        => Assert.Equal(expected, new FilmRestriction(age, mpaa).OfficialRating);
+    public void OfficialRating_MpaaFirstThenRussianAge(string? mpaa, string? age, string? expected)
+        => Assert.Equal(expected, new FilmRestriction(age, mpaa).GetOfficialRating(AgeRatingSystem.Mpaa));
+
+    [Theory]
+    [InlineData("r", "age18", "18+")]
+    [InlineData("pg13", "age12", "12+")]
+    [InlineData("g", null, "G")]
+    [InlineData("pg", "", "PG")]
+    [InlineData(null, "age6", "6+")]
+    [InlineData(null, null, null)]
+    public void OfficialRating_RussianAgeFirstThenMpaa(string? mpaa, string? age, string? expected)
+        => Assert.Equal(expected, new FilmRestriction(age, mpaa).GetOfficialRating(AgeRatingSystem.Russian));
+
+    [Theory]
+    [InlineData(AgeRatingSystem.Mpaa)]
+    [InlineData(AgeRatingSystem.Russian)]
+    public void OfficialRating_UnknownValueFallsBackToTheOtherSystem(AgeRatingSystem preferred)
+    {
+        // Kinopoisk adds values without notice; an unknown one must never be stored as a rating Jellyfin cannot read.
+        Assert.Equal("16+", new FilmRestriction("age16", "x").GetOfficialRating(preferred));
+        Assert.Equal("PG", new FilmRestriction("age99", "pg").GetOfficialRating(preferred));
+        Assert.Null(new FilmRestriction("age99", "x").GetOfficialRating(preferred));
+    }
+
+    [Fact]
+    public void OfficialRating_EveryKinopoiskValueMapsToARatingJellyfinKnows()
+    {
+        // Jellyfin's "us" rating table, and the ages it reads as numbers.
+        string[] jellyfinRatings = ["G", "PG", "PG-13", "R", "NC-17", "0+", "6+", "12+", "16+", "18+"];
+        string[] mpaa = ["g", "pg", "pg13", "r", "nc17", "PG13", " R "];
+        string[] ages = ["age0", "age6", "age12", "age16", "age18", "AGE18"];
+
+        Assert.All(mpaa, m => Assert.Contains(new FilmRestriction(null, m).GetOfficialRating(AgeRatingSystem.Mpaa), jellyfinRatings));
+        Assert.All(ages, a => Assert.Contains(new FilmRestriction(a, null).GetOfficialRating(AgeRatingSystem.Russian), jellyfinRatings));
+    }
+
+    [Fact]
+    public void FillFrom_UsesTheConfiguredAgeRatingSystem()
+    {
+        var film = new FilmInfo { Id = 1, Restriction = new FilmRestriction("age18", "r") };
+        var mpaa = MetadataResultExtensions.CreateResult<Movie>();
+        var russian = MetadataResultExtensions.CreateResult<Movie>();
+
+        mpaa.FillFrom(film, _defaults);
+        russian.FillFrom(film, new PluginConfiguration { AgeRating = AgeRatingSystem.Russian });
+
+        Assert.Equal("R", mpaa.Item.OfficialRating);
+        Assert.Equal("18+", russian.Item.OfficialRating);
+    }
 
     [Fact]
     public void FillFrom_SkipsCrewWithoutNameButKeepsTheRest()

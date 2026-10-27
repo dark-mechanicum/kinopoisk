@@ -20,6 +20,7 @@ public sealed class PluginConfigurationTests
         Assert.False(configuration.PreferIpv4);
         Assert.False(configuration.IncludeVoiceActors);
         Assert.Equal(RatingSource.Kinopoisk, configuration.CommunityRating);
+        Assert.Equal(AgeRatingSystem.Mpaa, configuration.AgeRating);
         Assert.False(configuration.TagTop250);
         Assert.False(configuration.IncludePersonBiography);
     }

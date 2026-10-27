@@ -89,7 +89,8 @@ public sealed class FilmApiLiveTests : IDisposable
         Assert.False(string.IsNullOrWhiteSpace(film.Synopsis));
         Assert.Contains(film.Genres, g => g.Name == "фантастика");
         Assert.Contains(film.Countries, c => c.Name == "США");
-        Assert.Equal("R", film.Restriction?.OfficialRating);
+        Assert.Equal("R", film.Restriction?.GetOfficialRating(AgeRatingSystem.Mpaa));
+        Assert.Equal("18+", film.Restriction?.GetOfficialRating(AgeRatingSystem.Russian));
         Assert.InRange(film.Rating?.GetCommunity(RatingSource.Kinopoisk) ?? 0, 7f, 10f);
         Assert.InRange(film.Rating?.Critics ?? 0, 1f, 100f);
         Assert.Contains(film.Actors?.Items ?? [], m => m.Person?.Id == KnownTitles.KeanuReevesId);

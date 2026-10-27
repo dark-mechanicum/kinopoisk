@@ -29,6 +29,9 @@ internal sealed class PluginOptions : IKinopoiskOptions
     public RatingSource CommunityRating => Current.CommunityRating;
 
     /// <inheritdoc />
+    public AgeRatingSystem AgeRating => Current.AgeRating;
+
+    /// <inheritdoc />
     public bool TagTop250 => Current.TagTop250;
 
     /// <inheritdoc />

@@ -68,7 +68,7 @@ public static class MetadataResultExtensions
         item.PremiereDate = ParseDate(film.WorldPremiere?.IncompleteDate);
         item.CommunityRating = film.Rating?.GetCommunity(options.CommunityRating);
         item.CriticRating = film.Rating?.Critics;
-        item.OfficialRating = film.Restriction?.OfficialRating;
+        item.OfficialRating = film.Restriction?.GetOfficialRating(options.AgeRating);
         item.Tagline = film.Tagline;
         item.Overview = string.IsNullOrWhiteSpace(film.Synopsis) ? film.ShortDescription : film.Synopsis;
 

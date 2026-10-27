@@ -60,6 +60,10 @@ kinopoisk.ru link: the site has no page for a single episode.
 - Genres get a capital first letter («Фантастика»), so they merge with genres from other providers. Items fetched before
   12.2.2.0 keep the lowercase genres until a «Replace all metadata» refresh.
 - Kinopoisk's "no photo" placeholders are never saved as images.
+- **Age rating** is stored as one value Jellyfin's parental control reads without extra setup: MPAA (`G`, `PG`,
+  `PG-13`, `R`, `NC-17`) or the Russian age (`0+`, `6+`, `12+`, `16+`, `18+`). By default MPAA comes first and the
+  Russian age is the fallback; series almost never have an MPAA rating on Kinopoisk, so they get the Russian age.
+  Episodes have no rating of their own on Kinopoisk and follow their series.
 - **Series** get the episode length as their runtime, «Завершён» / «Продолжается» (Ended / Continuing) and the end year
   from Kinopoisk's release years. Kinopoisk only knows the year, so the end date is 1 July of that year. Movies and
   episodes take their runtime from the media file: Jellyfin ignores a provider runtime for videos.
@@ -82,16 +86,17 @@ kinopoisk.ru link: the site has no page for a single episode.
 Dashboard → Plugins → «КиноПоиск». Defaults keep the behaviour of earlier releases. Changes apply to new requests;
 cached responses expire within an hour.
 
-| Setting                             | Default   | Effect                                                                   |
-| ----------------------------------- | --------- | ------------------------------------------------------------------------ |
-| Actors to fetch (1–200)             | 30        | Size of the cast list (and of the dubbing cast).                         |
-| Community rating                    | Kinopoisk | Kinopoisk or IMDb rating first; the other is the fallback.               |
-| Capitalize genres                   | on        | «Фантастика» instead of «фантастика».                                    |
-| Dubbing actors                      | off       | Adds the Russian voice cast with role «Озвучка».                         |
-| Top-250 tag                         | off       | Tags titles in a Kinopoisk Top-250 with «Топ-250 КиноПоиска».            |
-| Person biography                    | off       | Builds a person's overview from Kinopoisk facts, replacing the old one.  |
-| Pause between requests, ms (0–5000) | 0         | Raise it if Kinopoisk answers `429 Too Many Requests` during big scans.  |
-| Prefer IPv4                         | off       | Connects over IPv4 first; helps when IPv6 is broken and images time out. |
+| Setting                             | Default   | Effect                                                                           |
+| ----------------------------------- | --------- | -------------------------------------------------------------------------------- |
+| Actors to fetch (1–200)             | 30        | Size of the cast list (and of the dubbing cast).                                 |
+| Community rating                    | Kinopoisk | Kinopoisk or IMDb rating first; the other is the fallback.                       |
+| Age rating                          | MPAA      | MPAA (`G`…`NC-17`) or Russian age (`0+`…`18+`) first; the other is the fallback. |
+| Capitalize genres                   | on        | «Фантастика» instead of «фантастика».                                            |
+| Dubbing actors                      | off       | Adds the Russian voice cast with role «Озвучка».                                 |
+| Top-250 tag                         | off       | Tags titles in a Kinopoisk Top-250 with «Топ-250 КиноПоиска».                    |
+| Person biography                    | off       | Builds a person's overview from Kinopoisk facts, replacing the old one.          |
+| Pause between requests, ms (0–5000) | 0         | Raise it if Kinopoisk answers `429 Too Many Requests` during big scans.          |
+| Prefer IPv4                         | off       | Connects over IPv4 first; helps when IPv6 is broken and images time out.         |
 
 New fields (series runtime, status and end date, death dates) fill in on the next «Search for missing metadata»
 refresh. When «КиноПоиск» is the first metadata fetcher, any refresh also replaces values other providers set before,

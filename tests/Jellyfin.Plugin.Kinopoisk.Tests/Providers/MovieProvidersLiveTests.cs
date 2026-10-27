@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
+using Jellyfin.Plugin.Kinopoisk.Api.Models;
 using Jellyfin.Plugin.Kinopoisk.Common;
 using Jellyfin.Plugin.Kinopoisk.Configuration;
 using Jellyfin.Plugin.Kinopoisk.Extensions;
@@ -52,6 +53,20 @@ public sealed class MovieProvidersLiveTests : IDisposable
         Assert.Contains(result.People, p => p.Role == "Оператор" && p.Name == "Билл Поуп");
         Assert.DoesNotContain(result.People, p => p.Role == "Озвучка");
         Assert.All(result.People, p => Assert.True(p.TryGetKinopoiskId(out _)));
+    }
+
+    [Fact]
+    public async Task GetMetadata_WithRussianAgeRating_StoresTheRussianAge()
+    {
+        using var services = new LiveServices(new PluginConfiguration { AgeRating = AgeRatingSystem.Russian });
+        IRemoteMetadataProvider<Movie, MovieInfo> provider = services.Create<MovieMetadataProvider>();
+        var info = new MovieInfo();
+        info.SetKinopoiskId(KnownTitles.MatrixId);
+
+        var result = await provider.GetMetadata(info, _token);
+
+        Assert.True(result.HasMetadata);
+        Assert.Equal("18+", result.Item.OfficialRating);
     }
 
     [Fact]

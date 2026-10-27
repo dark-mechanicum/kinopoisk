@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Kinopoisk.Api;
+using Jellyfin.Plugin.Kinopoisk.Api.Models;
 using Jellyfin.Plugin.Kinopoisk.Common;
 using Xunit;
 
@@ -38,7 +39,8 @@ public sealed class SeriesAndPersonApiLiveTests : IDisposable
         Assert.Equal(2011, series.Year);
         Assert.Contains(series.ReleaseYears ?? [], y => y is { Start: 2011, End: 2019 });
         Assert.Contains(series.Genres, g => g.Name == "фэнтези");
-        Assert.Equal("18+", series.Restriction?.OfficialRating);
+        // Series have no MPAA rating on Kinopoisk: the Russian age is the fallback.
+        Assert.Equal("18+", series.Restriction?.GetOfficialRating(AgeRatingSystem.Mpaa));
         Assert.NotEmpty(series.Actors?.Items ?? []);
         Assert.False(string.IsNullOrWhiteSpace(series.ContentId));
     }

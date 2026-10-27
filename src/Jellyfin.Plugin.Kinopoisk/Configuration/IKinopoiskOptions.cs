@@ -25,6 +25,9 @@ public interface IKinopoiskOptions
     /// <summary>Gets the preferred source of the community rating; the other one is the fallback.</summary>
     RatingSource CommunityRating { get; }
 
+    /// <summary>Gets the preferred age rating system of the official rating; the other one is the fallback.</summary>
+    AgeRatingSystem AgeRating { get; }
+
     /// <summary>Gets a value indicating whether titles in a Kinopoisk Top-250 get a tag.</summary>
     bool TagTop250 { get; }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Jellyfin.Plugin.Kinopoisk.Api.Models;
 
@@ -9,31 +10,35 @@ namespace Jellyfin.Plugin.Kinopoisk.Api.Models;
 /// <param name="Mpaa">The MPAA rating, e.g. <c>r</c> or <c>pg13</c>.</param>
 public sealed record FilmRestriction(string? Age = null, string? Mpaa = null)
 {
-    /// <summary>
-    /// Gets the rating in a form Jellyfin understands: MPAA (<c>PG-13</c>) when known,
-    /// otherwise the Russian age (<c>18+</c>), otherwise null.
-    /// </summary>
-    public string? OfficialRating
+    // Only values Jellyfin's own rating tables know, so parental controls work without extra configuration:
+    // MPAA ratings are in its "us" table, and "18+"-style ages are read as the number itself.
+    private static readonly Dictionary<string, string> _mpaaRatings = new(StringComparer.OrdinalIgnoreCase)
     {
-        get
-        {
-            if (!string.IsNullOrWhiteSpace(Mpaa))
-            {
-                var mpaa = Mpaa.ToUpperInvariant();
-                return mpaa switch
-                {
-                    "PG13" => "PG-13",
-                    "NC17" => "NC-17",
-                    _ => mpaa,
-                };
-            }
+        ["g"] = "G",
+        ["pg"] = "PG",
+        ["pg13"] = "PG-13",
+        ["r"] = "R",
+        ["nc17"] = "NC-17",
+    };
 
-            if (!string.IsNullOrWhiteSpace(Age))
-            {
-                return Age.Replace("age", string.Empty, StringComparison.OrdinalIgnoreCase) + "+";
-            }
+    private static readonly Dictionary<string, string> _russianRatings = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["age0"] = "0+",
+        ["age6"] = "6+",
+        ["age12"] = "12+",
+        ["age16"] = "16+",
+        ["age18"] = "18+",
+    };
 
-            return null;
-        }
-    }
+    /// <summary>
+    /// Gets the rating in a form Jellyfin understands, from the preferred system with the other one as fallback.
+    /// </summary>
+    /// <param name="preferred">The preferred rating system.</param>
+    /// <returns><c>PG-13</c>, <c>18+</c>... or null when Kinopoisk gives no known rating.</returns>
+    public string? GetOfficialRating(AgeRatingSystem preferred) => preferred == AgeRatingSystem.Russian
+        ? Find(_russianRatings, Age) ?? Find(_mpaaRatings, Mpaa)
+        : Find(_mpaaRatings, Mpaa) ?? Find(_russianRatings, Age);
+
+    private static string? Find(Dictionary<string, string> ratings, string? value)
+        => value is not null && ratings.TryGetValue(value.Trim(), out var rating) ? rating : null;
 }

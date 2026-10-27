@@ -30,6 +30,13 @@
                             <option value="Imdb">IMDb (КиноПоиск, если нет)</option>
                         </select>
                     </div>
+                    <div class="selectContainer">
+                        <select is="emby-select" id="AgeRating" label="Возрастной рейтинг">
+                            <option value="Mpaa">MPAA: G, PG, PG-13, R, NC-17 (российский, если нет)</option>
+                            <option value="Russian">Российский: 0+, 6+, 12+, 16+, 18+ (MPAA, если нет)</option>
+                        </select>
+                        <div class="fieldDescription">Оба вида Jellyfin понимает для родительского контроля. Российский рейтинг у сериалов есть почти всегда, MPAA — редко.</div>
+                    </div>
                     <div class="checkboxContainer">
                         <label>
                             <input is="emby-checkbox" type="checkbox" id="CapitalizeGenres" />
@@ -87,13 +94,14 @@
                 var page = document.querySelector('#kinopoiskConfigPage');
                 var numbers = ['CrewLimit', 'MinRequestIntervalMs'];
                 var flags = ['CapitalizeGenres', 'IncludeVoiceActors', 'TagTop250', 'IncludePersonBiography', 'PreferIpv4'];
+                var choices = ['CommunityRating', 'AgeRating'];
 
                 page.addEventListener('pageshow', function () {
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                         numbers.forEach(function (id) { page.querySelector('#' + id).value = config[id]; });
                         flags.forEach(function (id) { page.querySelector('#' + id).checked = config[id]; });
-                        page.querySelector('#CommunityRating').value = config.CommunityRating;
+                        choices.forEach(function (id) { page.querySelector('#' + id).value = config[id]; });
                         Dashboard.hideLoadingMsg();
                     });
                 });
@@ -104,7 +112,7 @@
                     ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                         numbers.forEach(function (id) { config[id] = parseInt(page.querySelector('#' + id).value, 10); });
                         flags.forEach(function (id) { config[id] = page.querySelector('#' + id).checked; });
-                        config.CommunityRating = page.querySelector('#CommunityRating').value;
+                        choices.forEach(function (id) { config[id] = page.querySelector('#' + id).value; });
                         ApiClient.updatePluginConfiguration(pluginId, config).then(Dashboard.processPluginConfigurationUpdateResult);
                     });
                     return false;
