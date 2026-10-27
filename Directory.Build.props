@@ -10,11 +10,11 @@
   </PropertyGroup>
 
   <!--
-    Plugin version = <Jellyfin major>.<minor>.<feature>.<fix>, e.g. 12.2.0.0 for Jellyfin 12.2.
-    Overridden by CI from the release tag (v12.2.1.0 -> 12.2.1.0).
+    Plugin version = <Jellyfin major>.<minor>.<feature>.<fix>, e.g. 12.3.0.0 for Jellyfin 12.3.
+    Overridden by CI from the release tag (v12.3.1.0 -> 12.3.1.0).
   -->
   <PropertyGroup>
-    <Version>12.2.0.0</Version>
+    <Version>12.3.0.0</Version>
     <AssemblyVersion>$(Version)</AssemblyVersion>
     <FileVersion>$(Version)</FileVersion>
   </PropertyGroup>

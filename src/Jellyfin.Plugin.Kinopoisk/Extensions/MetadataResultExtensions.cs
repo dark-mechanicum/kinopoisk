@@ -20,7 +20,7 @@ public static class MetadataResultExtensions
 {
     private const string BiographyParagraphSeparator = "\n\n";
 
-    // Jellyfin 12.2 has no cinematographer kind; such people show up under "Crew" with the role as caption.
+    // Jellyfin 12.3 has no cinematographer kind; such people show up under "Crew" with the role as caption.
     private static readonly (Func<FilmInfo, FilmCrewMembers?> Members, PersonKind Kind, string? Role)[] _credits =
     [
         (f => f.Directors, PersonKind.Director, null),

@@ -3,7 +3,7 @@
 #   - targetAbi in build.yaml must be <Jellyfin major>.<minor>.0.0 of Jellyfin.Controller in Directory.Packages.props;
 #   - a release tag, if given, must be v<Jellyfin major>.<minor>.X.Y.
 # Usage: build/check-version.sh [tag]
-# Prints the Jellyfin line (e.g. 12.2) on success.
+# Prints the Jellyfin line (e.g. 12.3) on success.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
