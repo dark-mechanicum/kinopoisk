@@ -10,8 +10,8 @@
   </PropertyGroup>
 
   <ItemGroup Label="Jellyfin">
-    <PackageVersion Include="Jellyfin.Controller" Version="12.3.0" />
-    <PackageVersion Include="Jellyfin.Model" Version="12.3.0" />
+    <PackageVersion Include="Jellyfin.Controller" Version="12.4.0" />
+    <PackageVersion Include="Jellyfin.Model" Version="12.4.0" />
   </ItemGroup>
 
   <ItemGroup Label="Microsoft.Extensions (shared with the server)">
