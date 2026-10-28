@@ -1,7 +1,7 @@
 <Project>
   <!--
-    Versions mirror Jellyfin 12.3 so the plugin loads against exactly what the server ships:
-    https://github.com/jellyfin/jellyfin/blob/v12.3/Directory.Packages.props
+    Versions mirror Jellyfin 12.4 so the plugin loads against exactly what the server ships:
+    https://github.com/jellyfin/jellyfin/blob/v12.4/Directory.Packages.props
     Bump them together with the Jellyfin.* packages. A new Jellyfin minor version also moves the plugin
     version line: update targetAbi in build.yaml and Version in Directory.Build.props (see README, Versioning).
   -->
@@ -10,16 +10,16 @@
   </PropertyGroup>
 
   <ItemGroup Label="Jellyfin">
-    <PackageVersion Include="Jellyfin.Controller" Version="12.3.0" />
-    <PackageVersion Include="Jellyfin.Model" Version="12.3.0" />
+    <PackageVersion Include="Jellyfin.Controller" Version="12.4.0" />
+    <PackageVersion Include="Jellyfin.Model" Version="12.4.0" />
   </ItemGroup>
 
   <ItemGroup Label="Microsoft.Extensions (shared with the server)">
-    <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.12" />
-    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.12" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
-    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.12" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.14" />
   </ItemGroup>
 
   <ItemGroup Label="Analyzers">

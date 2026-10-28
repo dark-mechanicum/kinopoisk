@@ -1,16 +1,16 @@
-# КиноПоиск for Jellyfin 12.3
+# КиноПоиск for Jellyfin 12.4
 
 [![CI](https://github.com/dark-mechanicum/kinopoisk/actions/workflows/ci.yml/badge.svg)](https://github.com/dark-mechanicum/kinopoisk/actions/workflows/ci.yml)
 
-A [Jellyfin](https://jellyfin.org) 12.3 metadata plugin for [Kinopoisk](https://www.kinopoisk.ru/): titles, descriptions,
+A [Jellyfin](https://jellyfin.org) 12.4 metadata plugin for [Kinopoisk](https://www.kinopoisk.ru/): titles, descriptions,
 ratings, genres, cast & crew and artwork for movies, series, episodes and people. Plugin versions follow the Jellyfin
-version they support — `12.3.X.Y` for Jellyfin 12.3 (see [Versioning](#versioning)).
+version they support — `12.4.X.Y` for Jellyfin 12.4 (see [Versioning](#versioning)).
 
 It only talks to Yandex's own endpoints (`graphql.kinopoisk.ru` and `www.kinopoisk.ru/api`), so it keeps working behind
 the Russian white-listed internet, where third-party Kinopoisk APIs are unreachable.
 
 Based on [MiklinMA/jellyfin-kinopoisk-white](https://github.com/MiklinMA/jellyfin-kinopoisk-white) (GPL-3.0),
-ported to Jellyfin 12.3 / .NET 10 and reworked.
+ported to Jellyfin 12.4 / .NET 10 and reworked.
 
 ## Installation
 
@@ -23,7 +23,7 @@ ported to Jellyfin 12.3 / .NET 10 and reworked.
 
 ### Manually (offline)
 
-Download `jellyfin-plugin-kinopoisk_<version>.zip` matching your Jellyfin version (`12.3.X.Y` for Jellyfin 12.3) from
+Download `jellyfin-plugin-kinopoisk_<version>.zip` matching your Jellyfin version (`12.4.X.Y` for Jellyfin 12.4) from
 [Releases](https://github.com/dark-mechanicum/kinopoisk/releases), unpack it into
 `<jellyfin data>/plugins/Kinopoisk_<version>/` and restart Jellyfin.
 
@@ -133,14 +133,14 @@ Requires the .NET 10 SDK (see `global.json`).
 dotnet build Kinopoisk.slnx
 dotnet test Kinopoisk.slnx                         # hits the live Kinopoisk API
 dotnet format Kinopoisk.slnx --verify-no-changes
-./build/check-version.sh v12.3.0.0                 # versioning rules (see below)
-./build/package.sh 12.3.0.0 artifacts              # plugin zip as Jellyfin installs it
+./build/check-version.sh v12.4.0.0                 # versioning rules (see below)
+./build/package.sh 12.4.0.0 artifacts              # plugin zip as Jellyfin installs it
 ```
 
 ### Dependencies
 
-Every package version mirrors Jellyfin 12.3's own
-[`Directory.Packages.props`](https://github.com/jellyfin/jellyfin/blob/v12.3/Directory.Packages.props): a plugin runs inside
+Every package version mirrors Jellyfin 12.4's own
+[`Directory.Packages.props`](https://github.com/jellyfin/jellyfin/blob/v12.4/Directory.Packages.props): a plugin runs inside
 the server process, so shared libraries must match what the server ships. All versions live in
 `Directory.Packages.props`; Dependabot proposes `Jellyfin.*` updates, and the rest is bumped together with them.
 
@@ -167,8 +167,8 @@ from the site.
   (`Category=StreamingCatalog`) on a **self-hosted runner** with the label `kinopoisk-home` on a residential connection,
   and fails instead of skipping. If that runner is offline, the job waits in the queue and the daily drift report
   fails after the 24-hour queue timeout. It never runs for pull requests.
-- **`release.yml`** runs on a `v12.3.X.Y` tag. It rejects tags that do not match the supported Jellyfin version, then
-  builds, tests, creates the GitHub release «v12.3.X.Y for Jellyfin 12.3» with the plugin zip and adds the version with
+- **`release.yml`** runs on a `v12.4.X.Y` tag. It rejects tags that do not match the supported Jellyfin version, then
+  builds, tests, creates the GitHub release «v12.4.X.Y for Jellyfin 12.4» with the plugin zip and adds the version with
   its checksum to `manifest.json` on `main`.
 
 ## Versioning
@@ -177,13 +177,13 @@ Releases are aligned with the Jellyfin version they support:
 
 | Plugin version | Jellyfin                              | .NET |
 | -------------- | ------------------------------------- | ---- |
-| `12.3.X.Y`     | 12.3 — the latest Jellyfin 12 release | 10   |
+| `12.4.X.Y`     | 12.4 — the latest Jellyfin 12 release | 10   |
 
-1. **The first two numbers are the Jellyfin version** the release is built and tested against: `12.3.X.Y` supports
-   Jellyfin 12.3. `X` is bumped for new features, `Y` for fixes. The first release is `12.3.0.0`.
+1. **The first two numbers are the Jellyfin version** the release is built and tested against: `12.4.X.Y` supports
+   Jellyfin 12.4. `X` is bumped for new features, `Y` for fixes. The first release is `12.4.0.0`.
 2. **Only the latest Jellyfin minor version is supported.** The plugin always targets the newest Jellyfin 12.x release;
    older Jellyfin versions are not supported and their plugin line gets no more releases.
-3. **`targetAbi` equals the Jellyfin version** (`12.3.0.0`), so Jellyfin only offers a release to servers it was built for.
+3. **`targetAbi` equals the Jellyfin version** (`12.4.0.0`), so Jellyfin only offers a release to servers it was built for.
    Jellyfin installs a release on servers of that version or newer and always picks the highest compatible version.
 4. The rules are enforced by `build/check-version.sh`: CI fails when `targetAbi` in `build.yaml` does not match the
    `Jellyfin.Controller` version in `Directory.Packages.props`, and the release workflow refuses tags that do not start
@@ -192,18 +192,18 @@ Releases are aligned with the Jellyfin version they support:
 ### Releasing
 
 ```bash
-git tag v12.3.0.0 && git push origin v12.3.0.0     # next feature: v12.3.1.0, next fix: v12.3.1.1
+git tag v12.4.0.0 && git push origin v12.4.0.0     # next feature: v12.4.1.0, next fix: v12.4.1.1
 ```
 
 ### When Jellyfin publishes a new version
 
-- **Patch release** (e.g. 12.3.1): Dependabot bumps `Jellyfin.*`; nothing else changes and the plugin stays on `12.3.X.Y`.
-- **Minor release** (e.g. 12.4): Dependabot's pull request fails the version check on purpose. In that pull request:
-    1. update every version in `Directory.Packages.props` to match Jellyfin 12.4's own
+- **Patch release** (e.g. 12.4.1): Dependabot bumps `Jellyfin.*`; nothing else changes and the plugin stays on `12.4.X.Y`.
+- **Minor release** (e.g. 12.5): Dependabot's pull request fails the version check on purpose. In that pull request:
+    1. update every version in `Directory.Packages.props` to match Jellyfin 12.5's own
        [`Directory.Packages.props`](https://github.com/jellyfin/jellyfin/blob/master/Directory.Packages.props);
-    2. set `targetAbi: "12.4.0.0"` in `build.yaml` and `<Version>12.4.0.0</Version>` in `Directory.Build.props`;
+    2. set `targetAbi: "12.5.0.0"` in `build.yaml` and `<Version>12.5.0.0</Version>` in `Directory.Build.props`;
     3. update the version table above and the Jellyfin version mentioned in this README;
-    4. after merging, release `v12.4.0.0`.
+    4. after merging, release `v12.5.0.0`.
 
 ## License
 
